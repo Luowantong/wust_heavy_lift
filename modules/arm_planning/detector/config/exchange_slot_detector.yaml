@@ -1,0 +1,34 @@
+exchange_slot_detector:
+  ros__parameters:
+    # --- 图像处理与 PnP 算法参数 ---
+    binary_thresh: 110      # 二值化阈值
+    # 物理尺寸（米）：这是 PnP 解算的核心。
+    # 这里的 square_size 应为兑换槽四个 L 角点中心围成的正方形边长
+    square_size: 0.10      
+    debug: true             # 是否开启调试模式（发布可视化图像和 Marker）
+    no_hardware: true       # 是否为无硬件模拟模式（配合 local_path 使用）
+    # 本地视频或图片路径（用于 no_hardware: true 时模拟输入）
+    local_path: "raw_picture/test_blue_5.png"
+
+    # --- 状态机与稳定性控制参数 ---
+    # 稳定判定计数阈值：连续多少帧位姿在公差范围内，才从 TRACKING 转为 LOCKED
+    stable_threshold: 15    
+    # 位置公差（米）：当前帧与基准帧的位置偏差小于此值视为位置稳定
+    pos_tolerance: 0.005    
+    # 角度公差（度）：当前帧与基准帧的旋转角度偏差小于此值视为角度稳定
+    ori_tolerance: 2.0      
+    # 丢失缓冲限制（帧）：在 LOCKED 状态下，允许连续丢失多少帧而不重置状态机
+    lost_buffer_limit: 5    
+    # 强制锁定开关：若为 true，只要识别到一帧就立即进入 LOCKED 状态，忽略稳定计数
+    force_lock: false       
+
+    # --- 8mm 相机真实内参 ---
+    # 矩阵顺序：[fx, 0, cx, 0, fy, cy, 0, 0, 1]
+    # fx, fy 为焦距；cx, cy 为光学中心坐标
+    camera_matrix: [2381.82379, 0.0, 735.99867, 
+                    0.0, 2376.0304, 543.03644, 
+                    0.0, 0.0, 1.0]
+                    
+    # 畸变参数顺序：[k1, k2, p1, p2, k3]
+    # 分别对应径向畸变系数和切向畸变系数
+    dist_coeffs: [-0.039492, 0.057022, 0.002005, -0.000537, 0.000000]

@@ -1,0 +1,23 @@
+/hik_camera:
+  ros__parameters:
+    # --- 数据输入控制 ---
+    # 模式选择: "camera" (海康相机), "video" (读取本地mp4/avi), "image" (读取单张图片)
+    input_type: "video"
+    
+    # 本地文件路径 (仅当 input_type 为 video 或 image 时生效)
+    # 支持绝对路径或在启动脚本中处理
+    file_path: "/home/auauau/wust_arm_7axis_ws/raw_video/engineering.mp4"
+
+    # --- 相机基础设置 ---
+    camera_name: "narrow_stereo"
+    use_sensor_data_qos: true # 是否使用 SensorData (可靠性较低但实时性高) 的通信质量
+    
+    # --- 海康相机硬件参数 (仅 camera 模式生效) ---
+    # 曝光时间 (单位: 微秒 us). 增加曝光会变亮，但运动物体会产生拖影(模糊)
+    exposure_time: 6000.0
+    
+    # 增益 Gain (单位: dB). 增加增益会强制放大信号使图像变亮，但会增加噪点(雪花点)
+    gain: 32.0
+
+    # 帧率上限 (海康 SDK 内部控制)
+    fps: 60.0

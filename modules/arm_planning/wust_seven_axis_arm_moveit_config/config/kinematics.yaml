@@ -1,0 +1,41 @@
+main:
+  kinematics_solver: pick_ik/PickIkPlugin
+  kinematics_solver_search_resolution: 0.0050000000000000001
+  # 求解超时时间（秒）。对于带有 mimic 关节的复杂链，建议稍微调大（如 0.05 到 0.1）
+  kinematics_solver_timeout: 0.05
+
+  # 模式选择：
+  # global: 全球搜索，适合跳出局部最优解，解决 mimic 导致的特殊位姿问题（推荐）
+  # local: 局部搜索，速度快，但在复杂约束下容易陷入死胡同
+  mode: global
+
+  # 位置与旋转的权重比例：
+  # 1.0 表示完全重视位置，0.5 表示旋转角度的误差可以容忍度稍高
+  # 如果抓取时对姿态要求严苛，建议将 rotation_scale 调高至 1.0
+  position_scale: 1.0
+  rotation_scale: 0.5
+
+  # 停止条件（阈值）：
+  # 只要位置误差小于 1mm (0.001) 且姿态误差小于 0.01 弧度，求解器即认为成功
+  position_threshold: 0.001
+  orientation_threshold: 0.01
+
+  # 代价函数阈值：
+  # pick_ik 会计算一个总代价值，低于此值则停止计算
+  cost_threshold: 0.001
+
+  # 最小位移权重：
+  # 0.0 表示不关心关节移动的距离。
+  # 如果设为较高值，求解器会倾向于寻找与当前位置最接近的解（防止机械臂大幅度摆动）
+  minimal_displacement_weight: 0.0
+
+  # 梯度下降步长：
+  # 用于数值计算的步幅。太大会导致震荡无法收敛，太小会导致求解速度极慢
+  gd_step_size: 0.0001
+
+  # --- 建议增加的额外参数 (针对 Mimic 关节特别有用) ---
+
+  # 演化算法（进化策略）的世代数和个体数
+  # 当中间有关节受限时，增加这两个值可以帮助求解器在受限空间内找到可行解
+  memetic_num_generations: 10
+  memetic_num_individuals: 30

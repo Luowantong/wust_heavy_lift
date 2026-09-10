@@ -1,0 +1,26 @@
+/wust_arm_driver:
+  ros__parameters:
+    # 控制开关 (决定后续哪些参数生效)
+    use_fake_hardware: true       # [全局] true: 内部仿真模式; false: 串口通讯模式
+    debug: true                   # [全局] 开启后会打印轨迹点序号、串口校验等详细日志
+
+    # 仿真专用参数 (仅在 use_fake_hardware: true 时生效)
+    sim_max_speed: 1.5            # [仿真] 模拟关节最大旋转速度 (rad/s)
+    
+    # 实物硬件参数 (仅在 use_fake_hardware: false 时生效)
+    # 必须与底层单片机 (如 STM32) 的配置严格一致
+    device_name: "/dev/ttyUSB0"   # [实物] 串口设备挂载路径
+    baud_rate: 115200             # [实物] 通讯波特率
+ 
+    # 全局通用参数 (无论仿真还是实物均会使用)
+
+    joint_names: ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7"]
+
+    controller_freq: 50           # [全局] 发送指令的频率 (Hz)。
+                                  # 仿真时：目标点更新频率；实物时：串口发包频率
+    state_publish_rate: 50.0      # [全局] 发布 /joint_states 话题的频率 (Hz)
+                                  # 建议与 MoveIt 规划频率保持一致 (一般 50-100Hz)
+    
+    # 任务成功依据 (Action Server 科学判断标准)
+    goal_tolerance: 0.01          # [全局] 到达判定容差 (rad)。
+    goal_timeout: 8.0             # [全局] 轨迹执行最长允许时间 (s)。
