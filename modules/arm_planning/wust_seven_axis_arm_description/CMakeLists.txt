@@ -31,6 +31,10 @@ install(DIRECTORY urdf
 install(DIRECTORY meshes
   DESTINATION share/${PROJECT_NAME}/
 )
+# MuJoCo 仿真模型（meshdir="meshes" 相对自身解析，故与 meshes/ 同级安装）
+install(FILES wust_rm.xml
+  DESTINATION share/${PROJECT_NAME}/
+)
 
 install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}/
