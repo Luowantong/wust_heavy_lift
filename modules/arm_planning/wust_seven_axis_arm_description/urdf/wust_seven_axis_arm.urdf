@@ -471,8 +471,8 @@
         xyz="0 0 0"
         rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://wust_seven_axis_arm_description/meshes/LINK_TCP.STL" />
+        <box
+          size="0.05 0.05 0.05" />
       </geometry>
       <material
         name="">
@@ -485,8 +485,8 @@
         xyz="0 0 0"
         rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://wust_seven_axis_arm_description/meshes/LINK_TCP.STL" />
+        <box
+          size="0.05 0.05 0.05" />
       </geometry>
     </collision>
   </link>

@@ -3,3 +3,9 @@ install/
 log/
 __pycache__/
 *.pyc
+
+# 本机 IDE 配置（含绝对路径）
+.vscode/
+
+# 本地格式转换试验用的大型网格（LINK3.STL 已在库中）
+modules/arm_planning/wust_seven_axis_arm_description/meshes/LINK3.obj
