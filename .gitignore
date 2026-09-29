@@ -4,5 +4,9 @@ log/
 __pycache__/
 *.pyc
 
+# clangd 索引缓存；以及万一在包根目录放了编译数据库软链（指向 build/）时不要误提交
+.cache/
+compile_commands.json
+
 # 本机 IDE 配置（含绝对路径）
 .vscode/

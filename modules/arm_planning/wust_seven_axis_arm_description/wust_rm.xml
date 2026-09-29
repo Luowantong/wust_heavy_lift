@@ -130,12 +130,19 @@
     </contact>
 
     <actuator>
-        <motor name="act_J1" joint="JOINT1" gear="1" ctrllimited="true" ctrlrange="-8 8" forcelimited="true" forcerange="-8 8" />
-        <motor name="act_J2" joint="JOINT2" gear="1" ctrllimited="true" ctrlrange="-40 40" forcelimited="true" forcerange="-40 40" />
-        <motor name="act_J3" joint="JOINT3" gear="1" ctrllimited="true" ctrlrange="-20 20" forcelimited="true" forcerange="-20 20" />
-        <motor name="act_J4" joint="JOINT4" gear="1" ctrllimited="true" ctrlrange="-8 8" forcelimited="true" forcerange="-8 8" />
-        <motor name="act_J5" joint="JOINT5" gear="1" ctrllimited="true" ctrlrange="-8 8" forcelimited="true" forcerange="-8 8" />
-        <motor name="act_J6" joint="JOINT6" gear="1" ctrllimited="true" ctrlrange="-6 6" forcelimited="true" forcerange="-6 6" />
-        <motor name="act_J7" joint="JOINT7" gear="1" ctrllimited="true" ctrlrange="-4 4" forcelimited="true" forcerange="-4 4" />
+        <!-- 位置伺服：ctrl 即目标关节角(rad)，viewer 的 Control 滑块可直接把关节拖到目标角度。
+             稳态有约 2° 重力下垂 (= 力矩/kp)，与 kp 无关。
+             kv 受积分器稳定条件 kv*dt/I < 2 约束：J4~J7 的 armature=0.005 加上很小的
+             连杆惯量使 I≈0.0051，dt=0.002 时要求 kv < 5，故取 3（留约 1.7 倍余量）。
+             kv=10 会在 J6=60° 一类构型下出现每步变号的数值颤振（虽未发散但已失真），
+             降 kv 或减小 timestep 均可消除。
+             forcerange 沿用原力矩执行器的上限，保留物理真实性，兼作饱和保护。 -->
+        <position name="pos_J1" joint="JOINT1" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-8 8" />
+        <position name="pos_J2" joint="JOINT2" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-40 40" />
+        <position name="pos_J3" joint="JOINT3" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-20 20" />
+        <position name="pos_J4" joint="JOINT4" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-8 8" />
+        <position name="pos_J5" joint="JOINT5" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-8 8" />
+        <position name="pos_J6" joint="JOINT6" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-6 6" />
+        <position name="pos_J7" joint="JOINT7" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-4 4" />
     </actuator>
 </mujoco>
