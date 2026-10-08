@@ -12,9 +12,9 @@ def generate_launch_description():
 
     # 1. MoveIt Config
     moveit_config = (
-        MoveItConfigsBuilder("wust_arm_7axis")
-        .robot_description(file_path="config/wust_arm_7axis_description.urdf.xacro")
-        .robot_description_semantic(file_path="config/wust_arm_7axis_description.srdf")
+        MoveItConfigsBuilder("wust_seven_axis_arm")
+        .robot_description(file_path="config/wust_seven_axis_arm_description.urdf.xacro")
+        .robot_description_semantic(file_path="config/wust_seven_axis_arm_description.srdf")
         .robot_description_kinematics(file_path="config/kinematics.yaml")
         .joint_limits(file_path="config/joint_limits.yaml")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
@@ -32,7 +32,7 @@ def generate_launch_description():
 
     # 3. ros2_control
     ros2_controllers_path = os.path.join(
-        get_package_share_directory("wust_arm_7axis_moveit_config"),
+        get_package_share_directory("wust_seven_axis_arm_moveit_config"),
         "config",
         "ros2_controllers.yaml",
     )
@@ -79,7 +79,7 @@ def generate_launch_description():
 
     # 6. RViz 
     rviz_config = PathJoinSubstitution(
-        [FindPackageShare("wust_arm_7axis_moveit_config"), "launch", "moveit.rviz"]
+        [FindPackageShare("wust_seven_axis_arm_moveit_config"), "config", "moveit.rviz"]
     )
 
     rviz_node = Node(

@@ -1,0 +1,5 @@
+/**:
+  ros__parameters:
+    mujoco_plugins:
+      grasp_plugin:
+        type: "wust_mujoco_plugins/GraspPlugin"

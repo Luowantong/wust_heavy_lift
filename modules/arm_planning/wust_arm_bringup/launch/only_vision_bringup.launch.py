@@ -10,7 +10,7 @@ bringup_path = get_package_share_directory('wust_arm_bringup')
 sys.path.append(os.path.join(bringup_path, 'launch'))
 
 def generate_launch_description():
-    from common import node_params, launch_params
+    from common import node_params, launch_params, robot_state_publisher
     # 1. 组织相机组件
     hik_camera_node = ComposableNode(
         package='hik_camera',
@@ -64,12 +64,8 @@ def generate_launch_description():
         executable="static_transform_publisher",
         arguments=["0", "0", "0", "0", "0", "0", "world", "base_link"],
     )
-    robot_state_publisher = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        output="both",
-        parameters=[moveit_config.robot_description],
-    )
+    # robot_state_publisher 统一由 common.py 提供（基于 MoveIt 配置，
+    # 保证与 move_group / mtc_place 看到的是同一份 robot_description）
 
     return LaunchDescription([
             static_tf,

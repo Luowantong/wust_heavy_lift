@@ -50,7 +50,7 @@ def generate_launch_description():
     
     # ========== RViz ==========
     rviz_config = PathJoinSubstitution(
-        [FindPackageShare("wust_seven_axis_arm_description"), "launch", "moveit.rviz"]
+        [FindPackageShare("wust_seven_axis_arm_moveit_config"), "config", "moveit.rviz"]
     )
 
     rviz_node = Node(

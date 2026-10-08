@@ -1,0 +1,7 @@
+<library path="wust_mujoco_plugins">
+  <class name="wust_mujoco_plugins/GraspPlugin"
+         type="wust_mujoco_plugins::GraspPlugin"
+         base_class_type="mujoco_ros2_control_plugins::MuJoCoROS2ControlPluginBase">
+    <description>按 move_group 的附着事件开关 grasp/rest 焊接约束</description>
+  </class>
+</library>

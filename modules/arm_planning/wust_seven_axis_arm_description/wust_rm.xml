@@ -3,6 +3,22 @@
     <compiler angle="radian" inertiafromgeom="false" eulerseq="XYZ" meshdir="meshes" />
     <option timestep="0.002" iterations="50" solver="Newton" tolerance="1e-6" />
 
+    <contact>
+        <exclude body1="hollow_cylinder" body2="slot"/>
+        <exclude body1="LINK5" body2="hollow_cylinder"/>
+    </contact>
+
+    <equality>
+        <!--未抓取-->
+        <weld name="rest" body1="world" body2="hollow_cylinder"
+          relpose="0.5 0 0.31 0 1 0 0"
+          active="false"/>
+        <!--已抓取-->
+        <weld name="grasp" body1="LINK7" body2="hollow_cylinder"
+          relpose="0 0 -0.0325 0 0 0.7071 -0.7071"
+          active="false"/>
+    </equality>
+
     <default>
         <joint type="hinge" axis="0 0 1" limited="true" range="-3.1416 3.1416" damping="1.0" armature="0.01" frictionloss="0.05"/>
         <geom condim="3" friction="1 0.005 0.0001"/>
@@ -39,6 +55,17 @@
         <!-- 地面 z=0，与 base_link 最低点对齐（底座碰撞体最低点 z=0.000） -->
         <geom name="ground" type="plane" pos="0 0 0" size="10 10 0.1" material="floor_mat" rgba="1 1 1 1"/>
 
+        <body name="slot" pos="0.5 0.0 0.2">
+            <geom name="slot_base" type="box" size="0.05 0.05 0.005"/>
+            <geom name="slot_cylinder" type="cylinder" size="0.018 0.05" pos="0 0 0.055"/>
+        </body>
+
+        <body name="hollow_cylinder" pos="0.5 0.0 0.31">
+            <freejoint/>
+            <inertial pos="0 0 0" mass="0.1" diaginertia="0.0001 0.0001 0.0001"/>
+            <geom name="hollow" type="cylinder" size="0.0325 0.075"/>
+        </body>
+
         <body name="base_link" pos="0 0 0">
             <inertial pos="-0.052756 0 0.114" mass="77.643" diaginertia="2.5996 2.5225 4.4493" />
             <geom class="visual" name="base_visual" mesh="base_link" material="mat_white"/>
@@ -46,7 +73,7 @@
             <geom class="collision" name="base_col_foot" type="cylinder" size="0.18 0.015" pos="0 0 0.015"/>
 
             <body name="LINK1" pos="0 0 0.228">
-                <joint name="JOINT1"/>
+                <joint name="joint1"/>
                 <inertial pos="-0.030637 0.0020368 0.050543" mass="1.2631"
                           fullinertia="0.0011058 0.0023006 0.0020412 -3.0364e-05 5.2822e-05 -1.8449e-08" />
                 <geom class="visual" name="link1_visual" mesh="LINK1" material="mat_gray"/>
@@ -55,7 +82,7 @@
                       fromto="0.00892864 -0.0205286 0.0269046 0.0137667 -0.0316522 0.0414832"/>
 
                 <body name="LINK2" pos="0.024226 -0.0557 0.073" euler="1.5708 -0.77059 3.1416">
-                    <joint name="JOINT2"/>
+                    <joint name="joint2"/>
                     <inertial pos="0.17743949 -0.00252552 -0.00310724" mass="1.82422943"
                               fullinertia="0.00123111 0.00575479 0.00662515 -2.9697e-07 3.9307e-05 7.7012e-09" />
                     <geom class="visual" name="link2_visual" mesh="LINK2" material="mat_light"/>
@@ -64,7 +91,7 @@
                           fromto="0.0407408 0 0.00460318 0.275209 0 0.031095"/>
 
                     <body name="LINK3" pos="0.308 0 0.0348" euler="-3.1416 0 2.371">
-                        <joint name="JOINT3"/>
+                        <joint name="joint3"/>
                         <inertial pos="0.04032042 0.09633430 -0.05022441" mass="1.87813911"
                                   fullinertia="0.00166748 0.00237489 0.00170345 8.2712e-06 7.2782e-06 4.1448e-06" />
                         <geom class="visual" name="link3_visual" mesh="LINK3" material="mat_gray"/>
@@ -73,7 +100,7 @@
                               fromto="0.0314545 0 -0.00998075 0.0782645 0 -0.0248339"/>
 
                         <body name="LINK4" pos="0.104 0 -0.033" euler="1.5708 0 1.5708">
-                            <joint name="JOINT4" armature="0.005"/>
+                            <joint name="joint4" armature="0.005"/>
                             <inertial pos="-0.00098552 -0.00030265 0.02830966" mass="0.42994598"
                                       fullinertia="0.000144245 0.000169753 0.000168563 1.1144e-08 -4.3403e-08 -2.1439e-08" />
                             <geom class="visual" name="link4_visual" mesh="LINK4" material="mat_white"/>
@@ -82,7 +109,7 @@
                                   fromto="0 0 0.027 0 0 0.055"/>
 
                             <body name="LINK5" pos="0 0 0.08" euler="1.5708 -1.5708 0">
-                                <joint name="JOINT5" armature="0.005"/>
+                                <joint name="joint5" armature="0.005"/>
                                 <inertial pos="0.07961672 0.00201853 0.00005787" mass="0.51694292"
                                           fullinertia="0.000195068 0.000527557 0.000459009 -1.1367e-05 -2.6662e-08 -2.7743e-09" />
                                 <geom class="visual" name="link5_visual" mesh="LINK5" material="mat_beige"/>
@@ -91,7 +118,7 @@
                                       fromto="0.0249822 0.00094034 8.77182e-05 0.157015 0.00591011 0.000551317"/>
 
                                 <body name="LINK6" pos="0.178 0.0067 0.000625" euler="1.5708 -1.5708 0">
-                                    <joint name="JOINT6" armature="0.005"/>
+                                    <joint name="joint6" armature="0.005"/>
                                     <inertial pos="0.00005491 -0.02853983 -0.00527210" mass="0.26194751"
                                               fullinertia="0.000132212 0.000158499 0.000089342 3.5250e-08 6.9829e-09 6.8965e-07" />
                                     <geom class="visual" name="link6_visual" mesh="LINK6" material="mat_light"/>
@@ -100,7 +127,7 @@
                                           fromto="0 0.021 0 0 0.0305 0"/>
 
                                     <body name="LINK7" pos="0 0.0535 0" euler="1.5708 0 0">
-                                        <joint name="JOINT7" armature="0.005"/>
+                                        <joint name="joint7" armature="0.005"/>
                                         <inertial pos="0.000008446 0.000000001 0.0039645" mass="0.63109"
                                                   fullinertia="0.00018068 0.00027815 0.00025894 -2.1762e-06 -7.9769e-09 -5.4956e-11" />
                                         <geom class="visual" name="link7_visual" mesh="LINK7" material="mat_white"/>
@@ -127,6 +154,7 @@
         <exclude body1="LINK6" body2="LINK7"/>
         <exclude body1="LINK4" body2="LINK6"/>
         <exclude body1="LINK5" body2="LINK7"/>
+        <exclude body1="LINK7" body2="hollow_cylinder"/>
     </contact>
 
     <actuator>
@@ -137,12 +165,17 @@
              kv=10 会在 J6=60° 一类构型下出现每步变号的数值颤振（虽未发散但已失真），
              降 kv 或减小 timestep 均可消除。
              forcerange 沿用原力矩执行器的上限，保留物理真实性，兼作饱和保护。 -->
-        <position name="pos_J1" joint="JOINT1" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-8 8" />
-        <position name="pos_J2" joint="JOINT2" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-40 40" />
-        <position name="pos_J3" joint="JOINT3" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-20 20" />
-        <position name="pos_J4" joint="JOINT4" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-8 8" />
-        <position name="pos_J5" joint="JOINT5" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-8 8" />
-        <position name="pos_J6" joint="JOINT6" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-6 6" />
-        <position name="pos_J7" joint="JOINT7" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-4 4" />
+        <position name="pos_J1" joint="joint1" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-8 8" />
+        <position name="pos_J2" joint="joint2" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-40 40" />
+        <position name="pos_J3" joint="joint3" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-20 20" />
+        <position name="pos_J4" joint="joint4" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-8 8" />
+        <position name="pos_J5" joint="joint5" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-8 8" />
+        <position name="pos_J6" joint="joint6" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-6 6" />
+        <position name="pos_J7" joint="joint7" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-4 4" />
     </actuator>
+
+    <keyframe>
+            <key name="home" qpos="0 0 0 0 0 -3.14 0" qvel="0 0 0 0 0 0 0"/>
+    </keyframe>
+
 </mujoco>

@@ -14,20 +14,14 @@ def generate_launch_description():
     rviz_config_arg = DeclareLaunchArgument(
         "rviz_config", default_value="moveit.rviz", description="RViz configuration file"
     )
-    ros2_control_hardware_type_arg = DeclareLaunchArgument(
-        "ros2_control_hardware_type",
-        default_value="mock_components",
-        description="ROS2 control hardware type (mock or real)",
-    )
+    # 注：机械臂的 ros2_control.xacro 里硬件插件固定为 mock_components/GenericSystem，
+    # 不接收任何 hardware_type 参数，故这里不再传递无效的 xacro mapping。
 
     #  MoveIt 配置
     moveit_config = (
-        MoveItConfigsBuilder("wust_arm_7axis")
-        .robot_description(
-            file_path="config/wust_arm_7axis_description.urdf.xacro",
-            mappings={"ros2_control_hardware_type": LaunchConfiguration("ros2_control_hardware_type")},
-        )
-        .robot_description_semantic(file_path="config/wust_arm_7axis_description.srdf")
+        MoveItConfigsBuilder("wust_seven_axis_arm")
+        .robot_description(file_path="config/wust_seven_axis_arm_description.urdf.xacro")
+        .robot_description_semantic(file_path="config/wust_seven_axis_arm_description.srdf")
         .planning_scene_monitor(
             publish_robot_description=True, publish_robot_description_semantic=True
         )
@@ -70,7 +64,7 @@ def generate_launch_description():
 
     #  ros2_control (mock components)
     ros2_controllers_path = os.path.join(
-        get_package_share_directory("wust_arm_7axis_moveit_config"),
+        get_package_share_directory("wust_seven_axis_arm_moveit_config"),
         "config",
         "ros2_controllers.yaml",
     )
@@ -103,7 +97,7 @@ def generate_launch_description():
 
     #  RViz
     rviz_config = PathJoinSubstitution(
-        [FindPackageShare("wust_arm_7axis_moveit_config"), "launch", LaunchConfiguration("rviz_config")]
+        [FindPackageShare("wust_seven_axis_arm_moveit_config"), "config", LaunchConfiguration("rviz_config")]
     )
     rviz_node = Node(
         package="rviz2",
@@ -146,7 +140,6 @@ def generate_launch_description():
     #  LaunchDescription 
     return LaunchDescription([
         rviz_config_arg,
-        ros2_control_hardware_type_arg,
         robot_state_publisher_node,
         static_tf_node,
         ros2_control_node,

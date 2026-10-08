@@ -32,6 +32,8 @@ ament_target_dependencies(${PROJECT_NAME}
   moveit_core
   moveit_ros_planning
   moveit_ros_planning_interface
+  serial_driver
+  io_context
 )
 
 # 注册组件和生成节点可执行文件
