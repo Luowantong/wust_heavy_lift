@@ -116,7 +116,7 @@ def generate_launch_description():
 
     #  自定义 mtc_place_node
     mtc_place_node = Node(
-        package="mtc_place",
+        package="mtc",
         executable="mtc_place_node",
         output="screen",
         parameters=[

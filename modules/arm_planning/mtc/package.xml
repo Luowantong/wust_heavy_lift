@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>mtc_place</name>
+  <name>mtc</name>
   <version>1.0.0</version>
   <description>MTC Place Task with Vision Integration</description>
   <maintainer email="auauau@wust.edu.cn">auauau</maintainer>

@@ -26,7 +26,7 @@
 using GetDetectorState = detector_interfaces::srv::GetDetectorState;
 using SetDetectorState = detector_interfaces::srv::SetDetectorState;
 
-namespace mtc_place {
+namespace mtc {
 constexpr double slot_base_square_size = 0.10;             // 底座边长
 constexpr double slot_base_height = 0.01;                  // 底座厚度
 constexpr double slot_cylinder_height = 0.10;              // 兑换柱高度

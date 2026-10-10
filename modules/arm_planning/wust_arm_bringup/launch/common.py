@@ -45,7 +45,7 @@ move_group_node = Node(
 
 # 规划节点定义
 mtc_place_node = Node(
-    package="mtc_place",
+    package="mtc",
     executable="mtc_place_node",
     output="both",
     parameters=[

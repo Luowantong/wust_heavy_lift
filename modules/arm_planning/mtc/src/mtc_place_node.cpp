@@ -1,4 +1,4 @@
-#include "mtc_place/mtc_place_node.hpp"
+#include "mtc/mtc_place_node.hpp"
 #include <geometry_msgs/msg/detail/pose_stamped__struct.hpp>
 #include <moveit/task_constructor/solvers/pipeline_planner.h>
 #include <moveit/task_constructor/stage.h>
@@ -9,7 +9,7 @@
 #include <rclcpp/logging.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
-namespace mtc_place {
+namespace mtc {
 MTCTaskNode::MTCTaskNode(const rclcpp::NodeOptions &options) {
   /* ---------- node ---------- */
   node_ = std::make_shared<rclcpp::Node>("mtc_place_node", options);
@@ -572,7 +572,7 @@ void MTCTaskNode::publishDebugTF(const tf2::Transform &T,
 
 } // namespace mtc_place
 
-#include "mtc_place/mtc_place_node.hpp"
+#include "mtc/mtc_place_node.hpp"
 #include <chrono>
 #include <rclcpp/rclcpp.hpp>
 #include <thread>
@@ -581,7 +581,7 @@ int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
 
   rclcpp::NodeOptions options;
-  auto mtc_node = std::make_shared<mtc_place::MTCTaskNode>(options);
+  auto mtc_node = std::make_shared<mtc::MTCTaskNode>(options);
 
   rclcpp::executors::MultiThreadedExecutor executor;
   executor.add_node(mtc_node->getNodeBaseInterface());
