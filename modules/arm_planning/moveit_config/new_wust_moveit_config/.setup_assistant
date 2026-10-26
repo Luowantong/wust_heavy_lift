@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: new_wust_description
+    relative_path: urdf/robot.urdf
+  srdf:
+    relative_path: config/new_wust.srdf
+  package_settings:
+    author_name: lwt
+    author_email: 2826223614@qq.com
+    generated_timestamp: 1791817054
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity

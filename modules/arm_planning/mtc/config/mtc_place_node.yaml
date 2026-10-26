@@ -1,0 +1,22 @@
+mtc_place_node:
+  ros__parameters:
+    arm_group: main
+    hand_frame: LINK_TCP
+    planning_frame: base_link
+
+    # 最终放置位姿：插槽（底座中心）在 base_link 下的位姿
+    target_slot:
+      x: 0.45
+      y: 0.0
+      z: 0.20
+      roll: 0.0
+      pitch: 0.0
+      yaw: 0.0
+
+    # 触发方式（三种可共存）
+    auto_start: false
+    auto_start_delay: 3.0
+
+    # 是否允许 /exchange_slot/slot_pose 话题在运行时覆盖上面的 target_slot
+    # 不用视觉时保持 false，YAML 就是唯一目标来源
+    allow_slot_override: false

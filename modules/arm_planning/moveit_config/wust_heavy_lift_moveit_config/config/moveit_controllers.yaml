@@ -1,0 +1,26 @@
+# MoveIt 使用 SimpleControllerManager 来管理控制器
+moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
+
+trajectory_execution:
+  allowed_execution_duration_scaling: 10.0 # 允许执行时间 = 规划时间 × 10
+  allowed_goal_duration_margin: 5.0        # 额外允许的时间缓冲
+
+# 将控制器配置嵌套在插件定义的命名空间下
+moveit_simple_controller_manager:
+  controller_names:
+    - main_controller
+
+  main_controller:
+    type: FollowJointTrajectory
+    # 动作命名空间，通常对应 ros2_control 中的 action 接口
+    action_ns: follow_joint_trajectory
+    default: true
+    # 必须包含你 7 轴机械臂的所有关节名称，且与 URDF 中的名称严格一致
+    joints:
+      - joint1
+      - joint2
+      - joint3
+      - joint4
+      - joint5
+      - joint6
+      - joint7

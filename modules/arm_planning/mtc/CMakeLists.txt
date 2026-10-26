@@ -22,8 +22,7 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tl_expected REQUIRED)
 find_package(geometric_shapes REQUIRED)
-
-find_package(detector_interfaces REQUIRED)
+find_package(std_srvs REQUIRED)
 
 add_library(tl::expected ALIAS tl_expected::tl_expected)
 
@@ -44,9 +43,9 @@ ament_target_dependencies(mtc_place_node
   geometry_msgs
   tf2_ros
   tf2_geometry_msgs
-  detector_interfaces
   tl_expected
-  )
+  std_srvs
+)
 target_link_libraries(mtc_place_node
   ${EIGEN3_LIBRARIES}
   /opt/ros/humble/lib/libgeometric_shapes.so
@@ -66,6 +65,11 @@ install(
 
 install(
   DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
 

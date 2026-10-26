@@ -1,0 +1,50 @@
+planning_plugin: ompl_interface/OMPLPlanner
+# To optionally use Ruckig for jerk-limited smoothing, add this line to the response adapters below
+# - default_planner_request_adapters/AddRuckigTrajectorySmoothing
+#   default_planner_request_adapters/AddTimeOptimalParameterization
+
+request_adapters: >-
+  default_planner_request_adapters/AddTimeOptimalParameterization
+  default_planner_request_adapters/AddRuckigTrajectorySmoothing
+  default_planner_request_adapters/ResolveConstraintFrames
+  default_planner_request_adapters/FixWorkspaceBounds
+  default_planner_request_adapters/FixStartStateBounds
+  default_planner_request_adapters/FixStartStateCollision
+  default_planner_request_adapters/FixStartStatePathConstraints
+start_state_max_bounds_error: 0.02 # 初始状态越界允许误差
+start_state_max_dt: 0.5            # 初始状态插值的最大 dt
+jiggle_fraction: 0.05              # 当初始状态不满足约束时随机扰动的比例
+max_sampling_attempts: 200         # OMPL 每个状态采样最大尝试次数
+default_workspace_bounds: 5.0      # xyz 范围
+
+planner_configs:                   # MoveIt 生成轨迹后的处理
+  RRTConnectkConfigDefault: # 快速
+    type: geometric::RRTConnect
+    range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
+  RRTstarkConfigDefault:   # 渐优
+    type: geometric::RRTstar
+    range: 0.0  # Max motion added to tree. ==> maxDistance_ default: 0.0, if 0.0, set on setup()
+    goal_bias: 0.05  # When close to goal select goal, with this probability? default: 0.05
+    delay_collision_checking: 1  # Stop collision checking as soon as C-free parent found. default 1
+  FMTkConfigDefault:      # 适用于高维空间
+    type: geometric::FMT
+    num_samples: 1000  # number of states that the planner should sample. default: 1000
+    radius_multiplier: 1.1  # multiplier used for the nearest neighbors search radius. default: 1.1
+    nearest_k: 1  # use Knearest strategy. default: 1
+    cache_cc: 1  # use collision checking cache. default: 1
+    heuristics: 0  # activate cost to go heuristics. default: 0
+    extended_fmt: 1  # activate the extended FMT*: adding new samples if planner does not finish successfully. default: 1
+  SPARSkConfigDefault:   # 适用于高维空间
+    type: geometric::SPARS
+    stretch_factor: 3.0  # roadmap spanner stretch factor. multiplicative upper bound on path quality. It does not make sense to make this parameter more than 3. default: 3.0
+    sparse_delta_fraction: 0.25  # delta fraction for connection distance. This value represents the visibility range of sparse samples. default: 0.25
+    dense_delta_fraction: 0.001  # delta fraction for interface detection. default: 0.001
+    max_failures: 1000  # maximum consecutive failure limit. default: 1000
+
+main:
+  planner_configs:
+    - RRTConnectkConfigDefault
+    - RRTstarkConfigDefault
+    - FMTkConfigDefault
+    - SPARSkConfigDefault
+  projection_evaluator: joints(joint1,joint2)

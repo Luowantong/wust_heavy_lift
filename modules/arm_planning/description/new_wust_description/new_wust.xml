@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mujoco model="wust_arm2">
+    <compiler angle="radian" inertiafromgeom="false" eulerseq="XYZ" meshdir="meshes" />
+    <option timestep="0.002" iterations="50" solver="Newton" tolerance="1e-6" />
+
+    <contact>
+        <exclude body1="hollow_cylinder" body2="slot"/>
+        <exclude body1="link5" body2="hollow_cylinder"/>
+        <exclude body1="link6" body2="hollow_cylinder"/>
+    </contact>
+
+    <equality>
+        <!--未抓取-->
+        <weld name="rest" body1="world" body2="hollow_cylinder"
+          relpose="0 0 -0.1566 0 0 0.7071 -0.7071"
+          active="false"/>
+        <!--已抓取-->
+        <weld name="grasp" body1="link7" body2="hollow_cylinder"
+          relpose="0.0833 0 0 0 0 1 0"
+          active="false"/>
+    </equality>
+
+    <default>
+        <joint type="hinge" axis="0 0 1" limited="true" range="-3.1416 3.1416" damping="1.0" armature="0.01" frictionloss="0.05"/>
+        <geom condim="3" friction="1 0.005 0.0001"/>
+        <default class="visual">
+            <geom type="mesh" contype="0" conaffinity="0" group="1" density="0"/>
+        </default>
+        <default class="collision">
+            <geom group="3" contype="1" conaffinity="1"/>
+        </default>
+    </default>
+
+    <asset>
+        <material name="mat_white" rgba="1 1 1 1"/>
+        <material name="mat_gray" rgba="0.75294 0.75294 0.75294 1"/>
+        <material name="mat_light" rgba="0.89804 0.91765 0.92941 1"/>
+        <material name="mat_beige" rgba="0.77647 0.75686 0.73725 1"/>
+        <mesh name="base" file="base_collision.stl"/>
+        <mesh name="link1" file="link1_collision.stl"/>
+        <mesh name="link2" file="link2_collision.stl"/>
+        <mesh name="link3" file="link3_collision.stl"/>
+        <mesh name="link4" file="link4_collision.stl"/>
+        <mesh name="link5" file="link5_collision.stl"/>
+        <mesh name="link6" file="link6_collision.stl"/>
+        <mesh name="link7" file="link7_collision.stl"/>
+        <!-- 定义纹理 -->
+        <texture type="2d" name="checker_floor" builtin="checker" mark="edge" rgb1="0.6 0.8 1.0" rgb2="0.6 0.95 0.6" markrgb="0.2 0.2 0.2" width="512" height="512"/>
+        <!-- 定义材质 -->
+        <material name="floor_mat" texture="checker_floor" texrepeat="50 50" reflectance="0.1"/>
+    </asset>
+
+    <worldbody>
+        <!-- 地面 z=0，与 base 最低点对齐（底座碰撞体最低点 z=0.000） -->
+        <geom name="ground" type="plane" pos="0 0 0" size="10 10 0.1" material="floor_mat" rgba="1 1 1 1"/>
+
+        <body name="slot" pos="0.5 0.0 0.2">
+            <geom name="slot_base" type="box" size="0.05 0.05 0.005"/>
+            <geom name="slot_cylinder" type="cylinder" size="0.018 0.05" pos="0 0 0.055"/>
+        </body>
+
+        <body name="hollow_cylinder" pos="0.5 0.0 0.31">
+            <freejoint/>
+            <inertial pos="0 0 0" mass="0.1" diaginertia="0.0001 0.0001 0.0001"/>
+            <geom name="hollow" type="cylinder" size="0.0325 0.075"/>
+        </body>
+
+        <body name="base" pos="0 0 0">
+        <inertial pos="-0.05275621 0 -0.114" mass="77.64268623"
+                    fullinertia="2.59957459 2.52245405 4.4493324 0 0 0"/>
+        <geom class="visual" name="base_visual" mesh="base" material="mat_white"/>
+        <geom class="collision" name="base_col" mesh="base"/>
+
+        <body name="link1" pos="0 0 0">
+            <joint name="joint1" axis="0 0 -1"/>
+            <inertial pos="-0.02727394 0.00842308 0.06055814" mass="2.63911029"
+                    fullinertia="0.0056987 0.01110114 0.0105227 0.00178451 0.0008721 -0.00033231"/>
+            <geom class="visual" name="link1_visual" mesh="link1" material="mat_gray"/>
+            <geom class="collision" name="link1_col" mesh="link1"/>
+
+            <body name="link2" pos="0.02424 0.0072 0.073">
+            <joint name="joint2" axis="0 1 0"/>
+            <inertial pos="-0.1969102 -0.08309513 0.18808011" mass="2.16839329"
+                        fullinertia="0.01003323 0.01702904 0.01078354 -0.00117634 0.00714971 0.00107855"/>
+            <geom class="visual" name="link2_visual" mesh="link2" material="mat_beige"/>
+            <geom class="collision" name="link2_col" mesh="link2"/>
+
+            <body name="link3" pos="-0.22100422 -0.1247 0.21453973">
+                <joint name="joint3" axis="0 -1 0"/>
+                <inertial pos="0.03246142 0.15810874 0.05239528" mass="1.95129296"
+                        fullinertia="0.00805887 0.00793828 0.00486219 -0.00084279 0.00121672 0.00012153"/>
+                <geom class="visual" name="link3_visual" mesh="link3" material="mat_beige"/>
+                <geom class="collision" name="link3_col" mesh="link3"/>
+
+                <body name="link4" pos="0.072 0.1396 0">
+                <joint name="joint4" axis="1 0 0"/>
+                <inertial pos="0.06590589 0.00030868 -0.0001022" mass="0.54710506"
+                            fullinertia="0.00050822 0.00096167 0.00106722 0.00002396 -5.4e-7 8.2e-7"/>
+                <geom class="visual" name="link4_visual" mesh="link4" material="mat_light"/>
+                <geom class="collision" name="link4_col" mesh="link4"/>
+
+                <body name="link5" pos="0.112 0.013075 0">
+                    <joint name="joint5" axis="0 -1 0"/>
+                    <inertial pos="0.0697811 -0.01344256 0.00004184" mass="0.59565109"
+                            fullinertia="0.00060321 0.00068739 0.00062993 0.00000739 0.00000299 -7.3e-7"/>
+                    <geom class="visual" name="link5_visual" mesh="link5" material="mat_light"/>
+                    <geom class="collision" name="link5_col" mesh="link5"/>
+
+                    <body name="link6" pos="0.08050003 -0.0137 0.0135">
+                    <joint name="joint6" axis="0 0 -1"/>
+                    <inertial pos="0.0626967 0.00108019 -0.01078724" mass="0.28529112"
+                                fullinertia="0.00061516 0.00106579 0.00061896 0.00000854 0.00000796 0.00001387"/>
+                    <geom class="visual" name="link6_visual" mesh="link6" material="mat_light"/>
+                    <geom class="collision" name="link6_col" mesh="link6"/>
+
+                    <body name="link7" pos="0.0715 0 -0.0068">
+                        <joint name="joint7" axis="-1 0 0"/>
+                        <inertial pos="0.0502124 -0.00004321 -0.00014695" mass="1.13909779"
+                                fullinertia="0.0025491 0.00253909 0.00450439 -0.00000359 -0.0000047 0.00006385"/>
+                        <geom class="visual" name="link7_visual" mesh="link7" material="mat_white"/>
+                        <geom class="collision" name="link7_col" mesh="link7"/>
+
+                        <!-- LINK_TCP -->
+                        <body name="LINK_TCP" pos="0.0366 0 -0.081603" euler="3.1416 0 3.1416">
+                        </body>
+
+                        <!-- camera_link -->
+                        <body name="camera_link" pos="0 -0.08 0.04" euler="3.1416 0 3.1416">
+                        </body>
+                    </body>
+                    </body>
+                </body>
+                </body>
+            </body>
+            </body>
+        </body>
+    </body>    
+</worldbody>
+
+    <contact>
+        <exclude body1="base" body2="link1"/>
+        <exclude body1="link1" body2="link2"/>
+        <exclude body1="link2" body2="link3"/>
+        <exclude body1="link3" body2="link4"/>
+        <exclude body1="link4" body2="link5"/>
+        <exclude body1="link5" body2="link6"/>
+        <exclude body1="link6" body2="link7"/>
+        <exclude body1="link4" body2="link6"/>
+        <exclude body1="link5" body2="link7"/>
+        <exclude body1="link7" body2="hollow_cylinder"/>
+    </contact>
+
+    <actuator>
+        <!-- 位置伺服：ctrl 即目标关节角(rad)，viewer 的 Control 滑块可直接把关节拖到目标角度。
+             稳态有约 2° 重力下垂 (= 力矩/kp)，与 kp 无关。
+             kv 受积分器稳定条件 kv*dt/I < 2 约束：J4~J7 的 armature=0.005 加上很小的
+             连杆惯量使 I≈0.0051，dt=0.002 时要求 kv < 5，故取 3（留约 1.7 倍余量）。
+             kv=10 会在 J6=60° 一类构型下出现每步变号的数值颤振（虽未发散但已失真），
+             降 kv 或减小 timestep 均可消除。
+             forcerange 沿用原力矩执行器的上限，保留物理真实性，兼作饱和保护。 -->
+        <position name="pos_J1" joint="joint1" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-8 8" />
+        <position name="pos_J2" joint="joint2" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-40 40" />
+        <position name="pos_J3" joint="joint3" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-20 20" />
+        <position name="pos_J4" joint="joint4" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-8 8" />
+        <position name="pos_J5" joint="joint5" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-8 8" />
+        <position name="pos_J6" joint="joint6" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-6 6" />
+        <position name="pos_J7" joint="joint7" kp="300" kv="3" ctrlrange="-3.1416 3.1416" forcelimited="true" forcerange="-4 4" />
+    </actuator>
+
+    <keyframe>
+            <key name="home" qpos="0 0 0 0 0 0 0 0 0 0 1 0 0 0" qvel="0 0 0 0 0 0 0"/>
+    </keyframe>
+
+</mujoco>
