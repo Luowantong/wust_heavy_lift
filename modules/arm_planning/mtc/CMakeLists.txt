@@ -28,7 +28,9 @@ add_library(tl::expected ALIAS tl_expected::tl_expected)
 
 add_executable(mtc_place_node
   src/mtc_place_node.cpp
+  src/trajectory_executor.cpp
 )
+
 target_include_directories(mtc_place_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
