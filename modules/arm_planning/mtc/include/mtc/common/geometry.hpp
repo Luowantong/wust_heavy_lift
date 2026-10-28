@@ -1,3 +1,5 @@
+#pragma once
+
 namespace mtc {
 constexpr double slot_base_square_size = 0.10;             // 底座边长
 constexpr double slot_base_height = 0.01;                  // 底座厚度

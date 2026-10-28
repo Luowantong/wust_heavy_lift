@@ -27,8 +27,9 @@ find_package(std_srvs REQUIRED)
 add_library(tl::expected ALIAS tl_expected::tl_expected)
 
 add_executable(mtc_place_node
-  src/mtc_place_node.cpp
+  src/place/mtc_place_node.cpp
   src/trajectory_executor.cpp
+  src/common/task_node_base.cpp
 )
 
 target_include_directories(mtc_place_node PUBLIC
