@@ -15,8 +15,10 @@ def launch_setup(context, *args, **kwargs):
     from common import build
 
     model = LaunchConfiguration('model').perform(context)
+    task  = LaunchConfiguration('task').perform(context)
     use_sim_time_param = LaunchConfiguration('use_sim_time').perform(context).lower() == 'true'
-    r = build(model, use_sim_time=use_sim_time_param)
+    r = build(model, use_sim_time=use_sim_time_param, task=task)
+
 
 
     # 控制器路径也跟着 model 走
@@ -68,5 +70,6 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('model', default_value='wust_seven_axis_arm'),
         DeclareLaunchArgument('use_sim_time', default_value='true'),
+        DeclareLaunchArgument('task', default_value='place'),
         OpaqueFunction(function=launch_setup),
     ])

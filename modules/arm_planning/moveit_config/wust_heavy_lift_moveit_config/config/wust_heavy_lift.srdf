@@ -34,4 +34,7 @@
     <disable_collisions link1="link5" link2="link6" reason="Adjacent"/>
     <disable_collisions link1="link5" link2="link7" reason="Never"/>
     <disable_collisions link1="link6" link2="link7" reason="Adjacent"/>
+    <disable_collisions link1="LINK_TCP" link2="link5" reason="Never"/>
+    <disable_collisions link1="LINK_TCP" link2="link6" reason="Never"/>
+    <disable_collisions link1="LINK_TCP" link2="link7" reason="Adjacent"/>
 </robot>

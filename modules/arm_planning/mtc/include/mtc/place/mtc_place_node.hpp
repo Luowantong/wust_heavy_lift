@@ -27,7 +27,8 @@ namespace mtc {
   geometry_msgs::msg::Pose tfToPose(const tf2::Transform &tf);
 class MTCTaskNode : public TaskNodeBase {
 public:
-  explicit MTCTaskNode(const rclcpp::NodeOptions &options) : TaskNodeBase(options) {}
+    explicit MTCTaskNode(const rclcpp::NodeOptions &options)
+    : TaskNodeBase(options, "mtc_place_node", "target_slot") {}
 protected:
   moveit::task_constructor::Task createTask() override;
   void setupPlanningScene(const geometry_msgs::msg::PoseStamped &target) override;

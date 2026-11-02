@@ -32,6 +32,11 @@ install(DIRECTORY meshes
   DESTINATION share/${PROJECT_NAME}/
 )
 
+install(FILES wust_heavy_lift.xml
+  DESTINATION share/${PROJECT_NAME}/
+)
+
+
 #install(DIRECTORY launch
 #  DESTINATION share/${PROJECT_NAME}/
 #)

@@ -28,7 +28,9 @@ namespace mtc {
 
 class TaskNodeBase {
 public:
-  explicit TaskNodeBase(const rclcpp::NodeOptions &options);
+    explicit TaskNodeBase(const rclcpp::NodeOptions &options,
+                        const std::string &node_name,
+                        const std::string &target_prefix);
   virtual ~TaskNodeBase();
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr getNodeBaseInterface();
 
@@ -47,6 +49,7 @@ protected:
   std::atomic<State> state_{State::IDLE};
   std::atomic<bool> task_running_{false};
   std::thread pipeline_thread_;
+  std::string target_prefix_;
   moveit::task_constructor::Task task_;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
   tf2::Transform T_tcp_hollow_;

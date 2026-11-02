@@ -32,10 +32,22 @@ add_executable(mtc_place_node
   src/common/task_node_base.cpp
 )
 
+add_executable(mtc_pick_node
+  src/pick/mtc_pick_node.cpp
+  src/trajectory_executor.cpp
+  src/common/task_node_base.cpp
+)
+
 target_include_directories(mtc_place_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
+
+target_include_directories(mtc_pick_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 ament_target_dependencies(mtc_place_node
   rclcpp
   moveit_core
@@ -49,7 +61,28 @@ ament_target_dependencies(mtc_place_node
   tl_expected
   std_srvs
 )
+
+ament_target_dependencies(mtc_pick_node
+  rclcpp
+  moveit_core
+  moveit_ros_planning_interface
+  moveit_task_constructor_core
+  moveit_msgs
+  std_msgs
+  geometry_msgs
+  tf2_ros
+  tf2_geometry_msgs
+  tl_expected
+  std_srvs
+)
+
 target_link_libraries(mtc_place_node
+  ${EIGEN3_LIBRARIES}
+  /opt/ros/humble/lib/libgeometric_shapes.so
+  /opt/ros/humble/lib/x86_64-linux-gnu/liboctomap.so
+)
+
+target_link_libraries(mtc_pick_node
   ${EIGEN3_LIBRARIES}
   /opt/ros/humble/lib/libgeometric_shapes.so
   /opt/ros/humble/lib/x86_64-linux-gnu/liboctomap.so
@@ -59,6 +92,11 @@ target_link_libraries(mtc_place_node
 install(
   TARGETS mtc_place_node 
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(
+  TARGETS mtc_pick_node 
+  DESTINATION lib/${PROJECT_NAME} 
 )
 
 install(

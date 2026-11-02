@@ -22,9 +22,6 @@ main_controller:
       - joint7
     command_interfaces:
       - position
-      - velocity
-      - effort
     state_interfaces:
       - position
       - velocity
-      - effort

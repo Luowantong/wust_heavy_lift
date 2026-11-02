@@ -12,13 +12,11 @@
     <equality>
         <!--未抓取-->
         <weld name="rest" body1="world" body2="hollow_cylinder"
-          relpose="0 0 -0.1566 0 0 0.7071 -0.7071"
-          active="false"/>
+            relpose="0.40 0 0.28 1 0 0 0" active="false"/>
         <!--已抓取-->
         <weld name="grasp" body1="link7" body2="hollow_cylinder"
-          relpose="0.0833 0 0 0 0 1 0"
-          active="false"/>
-    </equality>
+        relpose="0.0366 0 -0.1566 1 0 0 0" active="false"/>
+</equality>
 
     <default>
         <joint type="hinge" axis="0 0 1" limited="true" range="-3.1416 3.1416" damping="1.0" armature="0.01" frictionloss="0.05"/>
@@ -54,12 +52,12 @@
         <!-- 地面 z=0，与 base 最低点对齐（底座碰撞体最低点 z=0.000） -->
         <geom name="ground" type="plane" pos="0 0 0" size="10 10 0.1" material="floor_mat" rgba="1 1 1 1"/>
 
-        <body name="slot" pos="0.5 0.0 0.2">
+        <body name="slot" pos="0.40 0.0 0.2">
             <geom name="slot_base" type="box" size="0.05 0.05 0.005"/>
             <geom name="slot_cylinder" type="cylinder" size="0.018 0.05" pos="0 0 0.055"/>
         </body>
 
-        <body name="hollow_cylinder" pos="0.5 0.0 0.31">
+        <body name="hollow_cylinder" pos="0.40 0.0 0.28">
             <freejoint/>
             <inertial pos="0 0 0" mass="0.1" diaginertia="0.0001 0.0001 0.0001"/>
             <geom name="hollow" type="cylinder" size="0.0325 0.075"/>

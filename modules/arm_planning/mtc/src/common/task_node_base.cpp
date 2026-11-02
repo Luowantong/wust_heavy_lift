@@ -1,5 +1,6 @@
 #include "mtc/trajectory_executor.hpp"
 #include "mtc/common/task_node_base.hpp"
+#include "mtc/common/tcp_hollow.hpp"
 #include <geometry_msgs/msg/detail/pose_stamped__struct.hpp>
 #include <moveit/trajectory_processing/time_optimal_trajectory_generation.h>
 #include <moveit/trajectory_processing/time_parameterization.h>
@@ -10,9 +11,12 @@
 #include <vector>
 
 namespace mtc {
-TaskNodeBase::TaskNodeBase(const rclcpp::NodeOptions &options) {
+TaskNodeBase::TaskNodeBase(const rclcpp::NodeOptions &options,
+                           const std::string &node_name,
+                           const std::string &target_prefix)
+    : target_prefix_(target_prefix) {
   /* ---------- node ---------- */
-  node_ = std::make_shared<rclcpp::Node>("mtc_place_node", options);
+  node_ = std::make_shared<rclcpp::Node>(node_name, options);
 
   /* ---------- parameters ---------- */
   arm_group_      = node_->get_parameter_or("arm_group", std::string("main"));
@@ -42,6 +46,8 @@ TaskNodeBase::TaskNodeBase(const rclcpp::NodeOptions &options) {
                 std::placeholders::_1, std::placeholders::_2),
       rmw_qos_profile_services_default, cb_group_task_);
 
+  T_tcp_hollow_ = makeTcpHollow();
+  
   // 运行时临时覆盖 YAML 里的目标（默认关闭，需 allow_slot_override:=true）
   if (allow_slot_override_) {
     rclcpp::SubscriptionOptions sub_opts;
@@ -148,26 +154,38 @@ void TaskNodeBase::startPlanningPipeline() {
 
   setState(State::PLANNING);
 
-  setupPlanningScene(target_slot_);
-  task_ = createTask();
-  task_.enableIntrospection();
+  setupPlanningScene(target_slot_);         
 
-  try {
-    task_.init();
-    RCLCPP_DEBUG(node_->get_logger(), "MTC Task init successfully");
-  } catch (const moveit::task_constructor::InitStageException &e) {
-    RCLCPP_ERROR(node_->get_logger(), "MTC Task init failed: %s", e.what());
-    std::cout << task_ << std::endl; // debug
-    setState(State::FAILED);
-    task_running_ = false;
-    return;
+  const int max_attempts = static_cast<int>(
+      node_->get_parameter_or("plan_attempts", 3));
+  bool planned = false;
+
+  for (int attempt = 1; attempt <= max_attempts && !planned; ++attempt) {
+    // 失败过的 Task 内部状态不可信，直接重建
+    task_ = createTask();
+    task_.enableIntrospection();
+
+    try {
+      task_.init();
+    } catch (const moveit::task_constructor::InitStageException &e) {
+      RCLCPP_ERROR(node_->get_logger(), "MTC Task init failed: %s", e.what());
+      std::cout << task_ << std::endl;
+      setState(State::FAILED);
+      task_running_ = false;
+      return;
+    }
+
+    planned = static_cast<bool>(task_.plan(1));
+    if (!planned)
+      RCLCPP_WARN(node_->get_logger(), "planning attempt %d/%d failed",
+                  attempt, max_attempts);
   }
 
-  if (!task_.plan(1)) {
+  if (!planned) {
+    RCLCPP_ERROR(node_->get_logger(), "Task planning failed after %d attempts",
+                 max_attempts);
     setState(State::FAILED);
     task_running_ = false;
-    RCLCPP_ERROR(node_->get_logger(), "Task planning failed!");
-    std::cout << task_ << std::endl; // debug
     return;
   }
 
@@ -179,7 +197,7 @@ void TaskNodeBase::startPlanningPipeline() {
 
   setState(State::EXECUTING);
 
-  TrajectoryExecutor executor(node_, arm_group_);
+  TrajectoryExecutor executor(node_, arm_group_, "hollow_cylinder", hand_frame_);
   const auto result = executor.execute(*solution);
 
   if (result.val == moveit_msgs::msg::MoveItErrorCodes::SUCCESS)
@@ -212,12 +230,12 @@ void TaskNodeBase::onPlanAndExecute(
 }
 
 void TaskNodeBase::loadTargetParams() {
-  const double x     = node_->get_parameter_or("target_slot.x", 0.0);
-  const double y     = node_->get_parameter_or("target_slot.y", 0.0);
-  const double z     = node_->get_parameter_or("target_slot.z", 0.0);
-  const double roll  = node_->get_parameter_or("target_slot.roll", 0.0);
-  const double pitch = node_->get_parameter_or("target_slot.pitch", 0.0);
-  const double yaw   = node_->get_parameter_or("target_slot.yaw", 0.0);
+  const double x     = node_->get_parameter_or(target_prefix_+".x", 0.0);
+  const double y     = node_->get_parameter_or(target_prefix_+".y", 0.0);
+  const double z     = node_->get_parameter_or(target_prefix_+".z", 0.0);
+  const double roll  = node_->get_parameter_or(target_prefix_+".roll", 0.0);
+  const double pitch = node_->get_parameter_or(target_prefix_+".pitch", 0.0);
+  const double yaw   = node_->get_parameter_or(target_prefix_+".yaw", 0.0);
 
   tf2::Quaternion q;
   q.setRPY(roll, pitch, yaw);

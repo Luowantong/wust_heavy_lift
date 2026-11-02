@@ -1,6 +1,7 @@
 #include "mtc/place/mtc_place_node.hpp"
 #include "mtc/common/geometry.hpp" 
 #include "mtc/trajectory_executor.hpp"
+#include "mtc/common/tcp_hollow.hpp"
 #include <geometry_msgs/msg/detail/pose_stamped__struct.hpp>
 #include <moveit/trajectory_processing/time_optimal_trajectory_generation.h>
 #include <moveit/trajectory_processing/time_parameterization.h>
@@ -70,24 +71,7 @@ void MTCTaskNode::setupPlanningScene(
   hollow.primitives[0].type = shape_msgs::msg::SolidPrimitive::CYLINDER;
   hollow.primitives[0].dimensions = {hollow_cylinder_h, hollow_cylinder_r};
 
-  tf2::Transform tf_hollow;
-  /* 计算位移：
-     1. X 方向：移动 0.0366，使圆柱中心对齐 LINK7 的 Z 轴。
-     2. Y 方向：0。
-     3. Z 方向：从 hand_frame_ 往回退，直到靠近 LINK7。
-        距离为 0.081603。若要相切，中心点应在 0.081603 - hollow_cylinder_r 处。
-        但为了保险（防止碰撞检测过敏），我们先移到 -0.05 附近。
-  */
-  double offset_x = 0.0366;
-  double offset_z = 0.075; // 往回移动，使侧面与 LINK7 平面相切
-
-  tf_hollow.setOrigin(tf2::Vector3(offset_x, 0, offset_z));
-
-  tf2::Quaternion q;
-  q.setRPY(M_PI / 2.0, 0, 0);
-  tf_hollow.setRotation(q);
-  // 保存 TCP 到 hollow 的变换
-  T_tcp_hollow_ = tf_hollow;
+  tf2::Transform tf_hollow = makeTcpHollow();
 
   hollow.pose = tfToPose(tf_hollow);
   hollow.operation = hollow.ADD;
@@ -247,9 +231,6 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
       dir.vector.z = insert_dir.z();
 
       insert->setDirection(dir);
-      insert->setMinMaxDistance(insert_offset_ - 0.05,
-                                insert_offset_); // 插入深度
-      //place->insert(std::move(insert));
     }
     // 3.4 添加物体
     {
@@ -286,7 +267,9 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
 
       slide->setMinMaxDistance(0.03, 0.04); // 100mm
 
-      cartesian->setMinFraction(0.5);
+      auto cartesian_slide = std::make_shared<solvers::CartesianPath>();
+      cartesian_slide->setStepSize(0.005);
+      cartesian_slide->setMinFraction(0.5);
 
       //place->insert(std::move(slide));
     }

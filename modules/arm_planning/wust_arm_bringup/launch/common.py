@@ -83,7 +83,7 @@ class RobotNodes:
     rviz_node: Node
 
 
-def build(model: str, use_sim_time: bool = False, **overrides) -> RobotNodes:
+def build(model: str, use_sim_time: bool = False, task: str = "place", **overrides) -> RobotNodes:
         
     """按模型名构造全部与模型相关的节点。
 
@@ -91,6 +91,9 @@ def build(model: str, use_sim_time: bool = False, **overrides) -> RobotNodes:
     overrides 用于临时覆盖（例如 arm_group / hand_frame）。
     """
     spec = _derive(model)
+    mtc_executable = "mtc_pick_node" if task == "pick" else "mtc_place_node"
+    mtc_config     = "pick.yaml"      if task == "pick" else "place.yaml"
+
     if overrides:
         spec = ModelSpec(**{**spec.__dict__, **overrides})
 
@@ -129,7 +132,7 @@ def build(model: str, use_sim_time: bool = False, **overrides) -> RobotNodes:
 
     mtc_node = Node(
         package="mtc",
-        executable="mtc_place_node",
+        executable=mtc_executable,
         output="both",
         parameters=[
             moveit_config.robot_description,
@@ -143,11 +146,12 @@ def build(model: str, use_sim_time: bool = False, **overrides) -> RobotNodes:
             {"hand_frame": spec.hand_frame},
             sim,
             {"planning_frame": spec.planning_frame},
-            os.path.join(get_package_share_directory('mtc'), 'config', 'mtc_place_node.yaml'),
+            os.path.join(get_package_share_directory('mtc'), 'config', 'common.yaml'),
+            os.path.join(get_package_share_directory('mtc'), 'config', f'{mtc_config}'),
         ],
         # 注意：--log-level 后面跟的是 logger 名 = 节点名，原来是 'mtc_place:=' 对不上
         ros_arguments=['--log-level',
-                       f'mtc_place_node:={launch_params["mtc_node_log_level"]}'],
+                       f'{mtc_executable}:={launch_params["mtc_node_log_level"]}'],
     )
 
     rviz_node = Node(

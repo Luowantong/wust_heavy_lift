@@ -136,12 +136,12 @@
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><mesh filename="package://wust_heavy_lift_description/meshes/LINK_TCP.stl"/></geometry>
+      <geometry><cylinder radius="0.02" length="0.02"/></geometry>
       <material name="LINK_TCP_color"><color rgba="1 1 1 1"/></material>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><mesh filename="package://wust_heavy_lift_description/meshes/LINK_TCP.stl"/></geometry>
+      <geometry><cylinder radius="0.02" length="0.02"/></geometry>
     </collision>
   </link>
   <link name="camera_link">
@@ -152,12 +152,12 @@
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><mesh filename="package://wust_heavy_lift_description/meshes/camera_link.stl"/></geometry>
+      <geometry><box size="0.03 0.03 0.03"/></geometry>
       <material name="camera_link_color"><color rgba="  1 1 1 1"/></material>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><mesh filename="package://wust_heavy_lift_description/meshes/camera_link.stl"/></geometry>
+      <geometry><box size="0.03 0.03 0.03"/></geometry>
     </collision>
   </link> 
   <joint name="joint1" type="revolute">
@@ -165,28 +165,28 @@
     <child link="link1"/>
     <origin xyz="0.0085 0.0481 0.21" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-3.14" upper="3.14" effort="10" velocity="3"/>
+    <limit lower="-3.14" upper="3.14" effort="40" velocity="3"/>
   </joint>
   <joint name="joint2" type="revolute">
     <parent link="link1"/>
     <child link="link2"/>
     <origin xyz="0.00345339 0.063 0.01949651" rpy="0 0 0"/>
     <axis xyz="-0.17441369 0 -0.98467247"/>
-    <limit lower="-3.14" upper="3.14" effort="10" velocity="3"/>
+    <limit lower="-3.14" upper="3.14" effort="40" velocity="3"/>
   </joint>
   <joint name="joint3" type="revolute">
     <parent link="link2"/>
     <child link="link3"/>
     <origin xyz="-0.04509137 0.09579555 -0.01600578" rpy="0 0 0"/>
     <axis xyz="-0.74314092 0.65606 0.13163154"/>
-    <limit lower="-3.14" upper="3.14" effort="10" velocity="3"/>
+    <limit lower="-3.14" upper="3.14" effort="20" velocity="3"/>
   </joint>
   <joint name="joint4" type="revolute">
     <parent link="link3"/>
     <child link="link4"/>
     <origin xyz="-0.08076361 0.10373461 0.03589668" rpy="0 0 0"/>
     <axis xyz="0.5858009 0.54280516 0.60183044"/>
-    <limit lower="-3.14" upper="3.14" effort="10" velocity="3"/>
+    <limit lower="-3.14" upper="3.14" effort="20" velocity="3"/>
   </joint>
   <joint name="joint5" type="revolute">
     <parent link="link4"/>

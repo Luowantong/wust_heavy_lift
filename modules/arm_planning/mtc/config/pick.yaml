@@ -1,0 +1,16 @@
+mtc_pick_node:
+  ros__parameters:
+    # 能量单元在 planning_frame 下的位姿（仿真里 hollow_cylinder 的初始位姿）
+    target_object:
+      x: 0.40
+      y: 0.0
+      z: 0.28
+      roll: 0.0
+      pitch: 0.0
+      yaw: 0.0
+
+    # 预抓取点：目标 TCP 再往上抬多少
+    approach_height: 0.05
+    lift_height: 0.1
+    yaw_candidates: 3
+    k_retreat: 0.3
