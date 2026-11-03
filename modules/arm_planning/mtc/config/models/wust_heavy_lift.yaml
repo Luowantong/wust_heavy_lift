@@ -1,0 +1,9 @@
+mtc_pick_node:
+  ros__parameters:
+    target_object: {x: 0.34, y: 0.0, z: 0.28}
+    approach_height: 0.05
+    lift_height: 0.05        # 待实测
+    k_retreat: 1.0           # 它的工作空间和 new_wust 完全不同
+mtc_place_node:
+  ros__parameters:
+    target_slot: {x: 0.34, y: 0.0, z: 0.20}

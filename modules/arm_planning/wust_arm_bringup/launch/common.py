@@ -148,6 +148,7 @@ def build(model: str, use_sim_time: bool = False, task: str = "place", **overrid
             {"planning_frame": spec.planning_frame},
             os.path.join(get_package_share_directory('mtc'), 'config', 'common.yaml'),
             os.path.join(get_package_share_directory('mtc'), 'config', f'{mtc_config}'),
+            os.path.join(get_package_share_directory('mtc'), 'config', 'models', f'{spec.model}.yaml'),
         ],
         # 注意：--log-level 后面跟的是 logger 名 = 节点名，原来是 'mtc_place:=' 对不上
         ros_arguments=['--log-level',

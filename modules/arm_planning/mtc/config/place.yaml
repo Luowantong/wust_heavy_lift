@@ -1,10 +1,2 @@
 mtc_place_node:
-  ros__parameters:
-    # 最终放置位姿：插槽（底座中心）在 base_link 下的位姿
-    target_slot:
-      x: 0.40
-      y: 0.0
-      z: 0.20
-      roll: 0.0
-      pitch: 0.0
-      yaw: 0.0
+  ros__parameters: {}

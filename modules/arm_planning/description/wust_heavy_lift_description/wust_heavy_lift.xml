@@ -29,11 +29,11 @@
   </asset>
   <worldbody>
     <!-- 以下三块与新模型无关，从 new_wust.xml 照搬：先保证 GraspPlugin 能加载 -->
-    <body name="slot" pos="0.45 0.0 0.2">
+    <body name="slot" pos="0.34 0.0 0.2">
       <geom name="slot_base" type="box" size="0.05 0.05 0.005"/>
       <geom name="slot_cylinder" type="cylinder" size="0.018 0.05" pos="0 0 0.055"/>
     </body>
-    <body name="hollow_cylinder" pos="0.45 0.0 0.28">
+    <body name="hollow_cylinder" pos="0.34 0.0 0.28">
       <freejoint/>
       <inertial pos="0 0 0" mass="0.1" diaginertia="0.0001 0.0001 0.0001"/>
       <geom name="hollow" type="cylinder" size="0.0325 0.075"/>
@@ -102,7 +102,7 @@
   </contact>
   <equality>
     <weld name="rest" body1="world" body2="hollow_cylinder"
-      relpose="0.45 0 0.28 1 0 0 0" active="false"/>
+      relpose="0.34 0 0.28 1 0 0 0" active="false"/>
     <weld name="grasp" body1="link7" body2="hollow_cylinder"
         relpose="0.0366 0 -0.1566 1 0 0 0" active="false"/>
 </equality>

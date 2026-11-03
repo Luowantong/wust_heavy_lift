@@ -90,7 +90,8 @@ void MTCTaskNode::setupPlanningScene(
   moveit_msgs::msg::AttachedCollisionObject attached;
   attached.object = hollow;
   attached.link_name = hand_frame_;
-  attached.touch_links = {hand_frame_, "link7"}; // 与手爪和LINK7允许接触
+  attached.touch_links = {hand_frame_, "link1", "link2", "link3",
+                        "link4", "link5", "link6", "link7"};
   psi.applyAttachedCollisionObject(attached);
 
   // 等待附着生效
@@ -122,8 +123,9 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
 
   
   auto cartesian = std::make_shared<solvers::CartesianPath>();
-  // 笛卡尔路径每 1mm 一个 waypoint
-  cartesian->setStepSize(0.001);
+  // 笛卡尔路径每 5mm 一个 waypoint（1mm 时 waypoint 太多，每个点都要独立解一次 IK）
+  cartesian->setStepSize(0.020);
+  cartesian->setMinFraction(0.9);
   cartesian->setTimeParameterization(
     std::make_shared<trajectory_processing::TimeOptimalTrajectoryGeneration>());
   cartesian->setMaxVelocityScalingFactor(1.0);
@@ -197,13 +199,16 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
         ik->properties().configureInitFrom(Stage::INTERFACE, {"target_pose"});
         ik->setMaxIKSolutions(3);
         ik->setMinSolutionDistance(0.1);
+        // 单元是空心的、预放置点上已经套住兑换柱，IK 阶段不判碰撞；
+        // 真正的碰撞由后面的 linear_insert 通过 allow_collision_for_insert 放行。
+        //ik->setIgnoreCollisions(true);
 
         alt->insert(std::move(ik));
       }
       place->insert(std::move(alt));
     }
 
-    // 3.2 插入时允许碰撞
+    // 3.2 插入时允许碰撞（放在 IK 之后：此时容器是正向计算的，编辑不会被反转）
     {
       auto allow_collision = std::make_unique<stages::ModifyPlanningScene>(
           "allow_collision_for_insert");
@@ -231,6 +236,9 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
       dir.vector.z = insert_dir.z();
 
       insert->setDirection(dir);
+      // 预放置点(物体中心 z=0.33) → 就位(0.28)，行程 5 cm
+      insert->setMinMaxDistance(0.09, 0.105);
+      place->insert(std::move(insert));
     }
     // 3.4 添加物体
     {
@@ -242,9 +250,16 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
       place->insert(std::move(attach));
     }
     // 3.5 第二段平移
+    // 注意：当前工装是"单元套在柱子上"，横向平移会把单元从柱子上蹭下来，
+    // 所以暂不插入这个 stage。启用时用它自己的求解器，别改共享的 cartesian，
+    // 否则会把 min_fraction=0.5 带进 linear_insert。
     {
+      auto cartesian_slide = std::make_shared<solvers::CartesianPath>();
+      cartesian_slide->setStepSize(0.005);
+      cartesian_slide->setMinFraction(0.5);
+
       auto slide = std::make_unique<stages::MoveRelative>("slide_along_slot_y",
-                                                          cartesian);
+                                                          cartesian_slide);
 
       slide->properties().configureInitFrom(Stage::PARENT, {"group"});
       slide->setIKFrame(hand_frame_);
@@ -266,10 +281,6 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
       slide->setDirection(dir);
 
       slide->setMinMaxDistance(0.03, 0.04); // 100mm
-
-      auto cartesian_slide = std::make_shared<solvers::CartesianPath>();
-      cartesian_slide->setStepSize(0.005);
-      cartesian_slide->setMinFraction(0.5);
 
       //place->insert(std::move(slide));
     }
@@ -318,7 +329,9 @@ bool MTCTaskNode::computeTargetTCP(tf2::Transform &base_T_tcp,
   tf2::Transform slot_T_hollow;
   slot_T_hollow.setOrigin({0, 0, pre_place_height_});
   tf2::Quaternion q;
-  q.setRPY(M_PI, 0, 0);
+  // 物体的 z 朝上，和 pick 的抓取约定一致；若绕 x 转 180°，
+  // hollow_T_tcp 会把 TCP 放到物体下方 7.5cm，直接撞进兑换柱。
+  q.setRPY(0, 0, 0);
   slot_T_hollow.setRotation(q);
   // base -> hollow
   base_T_hollow = base_T_slot * slot_T_hollow;

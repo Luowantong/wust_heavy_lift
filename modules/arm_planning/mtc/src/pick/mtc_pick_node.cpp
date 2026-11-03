@@ -181,7 +181,7 @@ moveit::task_constructor::Task MTCPickNode::createTask() {
       ik->properties().configureInitFrom(Stage::INTERFACE, {"target_pose"});
       ik->setMaxIKSolutions(3);
       ik->setMinSolutionDistance(0.1);
-      ik->setIgnoreCollisions(true);    
+      //ik->setIgnoreCollisions(true);    
 
       alt->insert(std::move(ik));
     }
