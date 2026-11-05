@@ -46,7 +46,18 @@ TaskNodeBase::TaskNodeBase(const rclcpp::NodeOptions &options,
                 std::placeholders::_1, std::placeholders::_2),
       rmw_qos_profile_services_default, cb_group_task_);
 
-  T_tcp_hollow_ = makeTcpHollow();
+  const double th_roll  = node_->get_parameter_or("tcp_hollow.roll",  0.0);
+  const double th_pitch = node_->get_parameter_or("tcp_hollow.pitch", -M_PI / 2);
+  const double th_yaw   = node_->get_parameter_or("tcp_hollow.yaw",   0.0);
+  const double th_x     = node_->get_parameter_or("tcp_hollow.x",     0.0);
+  const double th_y     = node_->get_parameter_or("tcp_hollow.y",     0.0);
+  const double th_z     = node_->get_parameter_or("tcp_hollow.z",     0.0);
+
+  T_tcp_hollow_ = makeTcpHollow(th_roll, th_pitch, th_yaw, th_x, th_y, th_z);
+
+  RCLCPP_INFO(node_->get_logger(),
+              "T_tcp_hollow rpy=[%.4f %.4f %.4f] xyz=[%.4f %.4f %.4f]",
+              th_roll, th_pitch, th_yaw, th_x, th_y, th_z);
   
   // 运行时临时覆盖 YAML 里的目标（默认关闭，需 allow_slot_override:=true）
   if (allow_slot_override_) {

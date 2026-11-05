@@ -139,10 +139,6 @@
       <geometry><cylinder radius="0.02" length="0.02"/></geometry>
       <material name="LINK_TCP_color"><color rgba="1 1 1 1"/></material>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><cylinder radius="0.02" length="0.02"/></geometry>
-    </collision>
   </link>
   <link name="camera_link">
     <inertial>
@@ -210,7 +206,7 @@
     <limit lower="-3.14" upper="3.14" effort="10" velocity="3"/>
   </joint>
 <joint name="vacuum_tcp" type="fixed">
-    <origin xyz="0.0366 0 -0.081603" rpy="3.1416 0 3.1416"/>
+    <origin xyz="-0.096 -0.075 0.159" rpy="-0.069 0.709 -2.595"/>
     <parent link="link7"/> <child link="LINK_TCP"/>
   </joint>
   <joint name="camera_joint" type="fixed">

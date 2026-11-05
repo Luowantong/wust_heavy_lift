@@ -128,15 +128,17 @@
       <geometry><mesh filename="package://new_wust_description/meshes/link7_collision.stl"/></geometry>
     </collision>
   </link>
-  <link name="LINK_TCP">
+    <link name="LINK_TCP">
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <mass value="0.1"/>
       <inertia ixx="1e-5" ixy="0" ixz="0" iyy="1e-5" iyz="0" izz="1e-5"/>
     </inertial>
-    <collision>
-      <geometry><box size="0.05 0.05 0.05"/></geometry>     <!-- 旧模型就是这么写的 -->
-    </collision>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.02" length="0.02"/></geometry>
+      <material name="LINK_TCP_color"><color rgba="1 0 0 1"/></material>   <!-- 红色，方便看 -->
+    </visual>
   </link>
   <link name="camera_link">
     <visual>
@@ -198,7 +200,7 @@
     <limit lower="-3.14" upper="3.14" effort="10" velocity="3"/>
   </joint>
   <joint name="vacuum_tcp" type="fixed">
-    <origin xyz="0.0366 0 -0.081603" rpy="3.1416 0 3.1416"/>
+    <origin xyz="0.13 0 0" rpy="0 1.5708 0"/>
     <parent link="link7"/> <child link="LINK_TCP"/>
   </joint>
   <joint name="camera_joint" type="fixed">

@@ -71,7 +71,7 @@ void MTCTaskNode::setupPlanningScene(
   hollow.primitives[0].type = shape_msgs::msg::SolidPrimitive::CYLINDER;
   hollow.primitives[0].dimensions = {hollow_cylinder_h, hollow_cylinder_r};
 
-  tf2::Transform tf_hollow = makeTcpHollow();
+  tf2::Transform tf_hollow = T_tcp_hollow_;
 
   hollow.pose = tfToPose(tf_hollow);
   hollow.operation = hollow.ADD;
@@ -165,11 +165,12 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
       publishDebugTF(base_T_tcp, "T_target_tcp");
 
       // yaw sampling 参数
-      int n_yaw = 3;               // 备选yaw 个数
+      int n_yaw = 1;               // 备选yaw 个数
       double yaw_range = M_PI / 2; // 备选yaw 范围
       tf2::Transform hollow_T_tcp = T_tcp_hollow_.inverse();
       for (int i = 0; i < n_yaw; ++i) {
-        double yaw = -yaw_range + i * (2 * yaw_range) / (n_yaw - 1);
+        const double yaw =
+            (n_yaw > 1) ? (-yaw_range + i * (2 * yaw_range) / (n_yaw - 1)) : 0.0;
         // hollow yaw rotation
         tf2::Transform hollow_rot;
         hollow_rot.setIdentity();
@@ -197,7 +198,7 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
         ik->properties().configureInitFrom(Stage::PARENT,
                                            {"group", "ik_frame"});
         ik->properties().configureInitFrom(Stage::INTERFACE, {"target_pose"});
-        ik->setMaxIKSolutions(3);
+        ik->setMaxIKSolutions(10);
         ik->setMinSolutionDistance(0.1);
         // 单元是空心的、预放置点上已经套住兑换柱，IK 阶段不判碰撞；
         // 真正的碰撞由后面的 linear_insert 通过 allow_collision_for_insert 放行。
@@ -214,6 +215,11 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
           "allow_collision_for_insert");
       std::vector<std::string> slot_objects = {"slot_cylinder", "slot_base"};
       allow_collision->allowCollisions("hollow_cylinder", slot_objects, true);
+      std::vector<std::string> gripper_links = {
+          "link1", "link2", "link3", "link4", "link5", "link6", "link7", hand_frame_};
+      allow_collision->allowCollisions("slot_cylinder", gripper_links, true);
+      allow_collision->allowCollisions("slot_base",     gripper_links, true);
+
       place->insert(std::move(allow_collision));
     }
 

@@ -15,7 +15,7 @@
             relpose="0.40 0 0.28 1 0 0 0" active="false"/>
         <!--已抓取-->
         <weld name="grasp" body1="link7" body2="hollow_cylinder"
-        relpose="0.0366 0 -0.1566 1 0 0 0" active="false"/>
+        relpose="0.13 0 0 1 0 0 0" active="false"/>
 </equality>
 
     <default>
@@ -119,7 +119,7 @@
                         <geom class="collision" name="link7_col" mesh="link7"/>
 
                         <!-- LINK_TCP -->
-                        <body name="LINK_TCP" pos="0.0366 0 -0.081603" euler="3.1416 0 3.1416">
+                        <body name="LINK_TCP" pos="0.13 0 0" euler="0 1.5708 0">
                         </body>
 
                         <!-- camera_link -->

@@ -43,9 +43,6 @@ void MTCPickNode::setupPlanningScene(
   hollow.operation = hollow.ADD;
   psi.applyCollisionObject(hollow);
 
-  // 夹爪属性（place/pick 共用）
-  T_tcp_hollow_ = makeTcpHollow();
-
   // 调试 TF
   tf2::Transform base_T_object;
   tf2::fromMsg(target.pose, base_T_object);
@@ -61,12 +58,11 @@ bool MTCPickNode::computeGraspTCP(tf2::Transform &base_T_tcp_pre) {
   tf2::Transform base_T_tcp_grasp = base_T_object * hollow_T_tcp;
 
   // 预抓取点：沿物体 +z 抬高
-  tf2::Vector3 z_axis =
-      tf2::Matrix3x3(base_T_object.getRotation()).getColumn(2).normalized();
-
+    tf2::Vector3 approach_axis =
+      tf2::Matrix3x3(base_T_tcp_grasp.getRotation()) * tf2::Vector3(0, 0, 1);
   base_T_tcp_pre = base_T_tcp_grasp;
   base_T_tcp_pre.setOrigin(base_T_tcp_grasp.getOrigin() +
-                           z_axis * approach_height_);
+                           approach_axis * approach_height_);
   return true;
 }
 
@@ -102,6 +98,19 @@ moveit::task_constructor::Task MTCPickNode::createTask() {
     task.add(std::move(cs));
   }
 
+  // 1.5 允许单元与手臂碰撞（侧抓时单元夹在两爪之间，必然贴着 link6/link7）。
+  //     必须放在 task 层、Connect 之前：Connect 的目标状态就是容器起始状态
+  //     （IK 解），它也要用这套碰撞豁免；放进 pick_container 里就管不到 Connect 了。
+  //     紧跟在 current 后面，MTC 会正向计算（任务树里箭头是 →）。
+  {
+    auto allow = std::make_unique<stages::ModifyPlanningScene>(
+        "allow_collision_for_grasp");
+    std::vector<std::string> gripper_links = {
+        "link1", "link2", "link3", "link4", "link5", "link6", "link7", hand_frame_};
+    allow->allowCollisions("hollow_cylinder", gripper_links, true);
+    task.add(std::move(allow));
+  }
+
   // 2. 连接阶段：从当前位置移动到预放置点上方
   {
     auto connect = std::make_unique<stages::Connect>(
@@ -117,151 +126,148 @@ moveit::task_constructor::Task MTCPickNode::createTask() {
   {
     auto pick = std::make_unique<SerialContainer>("pick_container");
     task.properties().exposeTo(pick->properties(), {"group", "ik_frame"});
-      // 3.1 生成预抓取姿态
-  {
-    auto alt = std::make_unique<Alternatives>("ik_yaw_alternative");
-    pick->properties().exposeTo(alt->properties(), {"group", "ik_frame"});
 
-    tf2::Transform base_T_tcp_pre;
-    if (!computeGraspTCP(base_T_tcp_pre))
-      throw std::runtime_error("grasp pose compute failed");
-
-    tf2::Transform base_T_object;
-    tf2::fromMsg(target_slot_.pose, base_T_object);
-    tf2::Vector3 z_axis =
-    tf2::Matrix3x3(base_T_object.getRotation()).getColumn(2).normalized();
-    tf2::Vector3 dir_v = z_axis;
-
-
-    publishDebugTF(base_T_object, "T_target_object");
-    publishDebugTF(base_T_tcp_pre, "T_target_tcp");
-
-    // yaw sampling 参数
-    const int n_yaw = yaw_candidates_;
-    const double yaw_range = M_PI / 2;
-    tf2::Transform hollow_T_tcp = T_tcp_hollow_.inverse();
-    for (int i = 0; i < n_yaw; ++i) {
-      const double yaw =
-          (n_yaw > 1) ? (-yaw_range + i * (2 * yaw_range) / (n_yaw - 1)) : 0.0;
-
-      // 绕物体自身 z 轴转
-      tf2::Transform object_rot;
-      object_rot.setIdentity();
-      tf2::Quaternion q;
-      q.setRPY(0, 0, yaw);
-      object_rot.setRotation(q);
-
-      tf2::Transform base_T_object_yaw = base_T_object * object_rot;
-      tf2::Transform base_T_tcp_grasp = base_T_object_yaw * hollow_T_tcp;
-
-      tf2::Transform base_T_tcp_pre_yaw = base_T_tcp_grasp;
-      base_T_tcp_pre_yaw.setOrigin(base_T_tcp_grasp.getOrigin() +
-                                   z_axis * approach_height_);
-
-      geometry_msgs::msg::PoseStamped pose;
-      pose.header.frame_id = planning_frame_;
-      tf2::toMsg(base_T_tcp_pre_yaw, pose.pose);
-
-      publishDebugTF(base_T_object_yaw,
-                     "T_target_object_yaw_" + std::to_string(i));
-      publishDebugTF(base_T_tcp_pre_yaw,
-                     "T_target_tcp_yaw_" + std::to_string(i));
-
-      // GeneratePose
-      auto gen = std::make_unique<stages::GeneratePose>(
-          "gen_pose_yaw_" + std::to_string(i));
-      gen->setPose(pose);
-      gen->setMonitoredStage(current_state_ptr);
-
-      // ComputeIK
-      auto ik = std::make_unique<stages::ComputeIK>(
-          "compute_ik_yaw_" + std::to_string(i), std::move(gen));
-      ik->setIKFrame(hand_frame_);
-      ik->properties().configureInitFrom(Stage::PARENT, {"group", "ik_frame"});
-      ik->properties().configureInitFrom(Stage::INTERFACE, {"target_pose"});
-      ik->setMaxIKSolutions(3);
-      ik->setMinSolutionDistance(0.1);
-      //ik->setIgnoreCollisions(true);    
-
-      alt->insert(std::move(ik));
+    // 3.0 容器内先放 allow：ComputeIK / approach 都要看得到这条 ACM
+    {
+      auto allow = std::make_unique<stages::ModifyPlanningScene>(
+          "allow_collision_in_container");
+      std::vector<std::string> gripper_links = {
+          "link1", "link2", "link3", "link4", "link5", "link6", "link7", hand_frame_};
+      allow->allowCollisions("hollow_cylinder", gripper_links, true);
+      pick->insert(std::move(allow));
     }
-    pick->insert(std::move(alt));
-  }
 
-  {
-    auto allow = std::make_unique<stages::ModifyPlanningScene>(
-        "allow_collision_for_grasp");
-    std::vector<std::string> gripper_links = {
-        "link1", "link2", "link3", "link4", "link5", "link6", "link7", hand_frame_};
-    allow->allowCollisions("hollow_cylinder", gripper_links, true);
-    pick->insert(std::move(allow));        
-  }
+    // 3.1 生成预抓取姿态
+    {
+      auto alt = std::make_unique<Alternatives>("ik_yaw_alternative");
+      pick->properties().exposeTo(alt->properties(), {"group", "ik_frame"});
 
-
-  // 3.3 笛卡尔下降
-  {
-    auto approach = std::make_unique<stages::MoveRelative>("approach", cartesian);
-    approach->properties().configureInitFrom(Stage::PARENT, {"group"});
-    approach->setIKFrame(hand_frame_);
-
-    tf2::Transform base_T_object;
-    tf2::fromMsg(target_slot_.pose, base_T_object);
-    tf2::Vector3 z_axis =
-        tf2::Matrix3x3(base_T_object.getRotation()).getColumn(2).normalized();
-    tf2::Vector3 dir_v = -z_axis;   // 沿物体轴向下
-
-    geometry_msgs::msg::Vector3Stamped dir;
-    dir.header.frame_id = planning_frame_;
-    dir.vector.x = dir_v.x();
-    dir.vector.y = dir_v.y();
-    dir.vector.z = dir_v.z();
-
-    approach->setDirection(dir);
-    approach->setMinMaxDistance(approach_height_ * 0.8, approach_height_);
-    pick->insert(std::move(approach));
-  }
-
-  // 3.4 附着（触发 GraspPlugin 的 weld）
-  {
-    auto attach = std::make_unique<stages::ModifyPlanningScene>("attach_hollow");
-    attach->attachObject("hollow_cylinder", hand_frame_);
-    pick->insert(std::move(attach));
-  }
-
-  // 3.5 抬起
-  {
-    auto lift = std::make_unique<stages::MoveRelative>("lift", cartesian);
-    lift->properties().configureInitFrom(Stage::PARENT, {"group"});
-    lift->setIKFrame(hand_frame_);
+      tf2::Transform base_T_tcp_pre;
+      if (!computeGraspTCP(base_T_tcp_pre))
+        throw std::runtime_error("grasp pose compute failed");
 
       tf2::Transform base_T_object;
-    tf2::fromMsg(target_slot_.pose, base_T_object);
-    tf2::Vector3 z_axis =
-        tf2::Matrix3x3(base_T_object.getRotation()).getColumn(2).normalized();
+      tf2::fromMsg(target_slot_.pose, base_T_object);
 
-    // 抬起方向 = 物体 +z 向上 + 朝底座水平回撤。
-    const double kRetreat = k_retreat_;  
-    tf2::Vector3 toward_base(-base_T_object.getOrigin().x(),
-                             -base_T_object.getOrigin().y(), 0.0);
-    if (toward_base.length() > 1e-6)
-      toward_base.normalize();
-    else
-      toward_base.setZero();
-    tf2::Vector3 dir_v = (z_axis + toward_base * kRetreat).normalized();
+      publishDebugTF(base_T_object, "T_target_object");
+      publishDebugTF(base_T_tcp_pre, "T_target_tcp");
 
-    geometry_msgs::msg::Vector3Stamped dir;
-    dir.header.frame_id = planning_frame_;
-    dir.vector.x = dir_v.x();
-    dir.vector.y = dir_v.y();
-    dir.vector.z = dir_v.z();
+      const int n_yaw = yaw_candidates_;
+      const double yaw_range = M_PI / 2;
+      tf2::Transform hollow_T_tcp = T_tcp_hollow_.inverse();
+      for (int i = 0; i < n_yaw; ++i) {
+        const double yaw =
+            (n_yaw > 1) ? (-yaw_range + i * (2 * yaw_range) / (n_yaw - 1)) : 0.0;
 
-    lift->setDirection(dir);
-    lift->setMinMaxDistance(lift_height_ * 0.95, lift_height_);
+        tf2::Transform object_rot;
+        object_rot.setIdentity();
+        tf2::Quaternion q;
+        q.setRPY(0, 0, yaw);
+        object_rot.setRotation(q);
 
-    pick->insert(std::move(lift));
+        tf2::Transform base_T_object_yaw = base_T_object * object_rot;
+        tf2::Transform base_T_tcp_grasp = base_T_object_yaw * hollow_T_tcp;
+        tf2::Vector3 approach_axis =
+            tf2::Matrix3x3(base_T_tcp_grasp.getRotation()) * tf2::Vector3(0, 0, 1);
+        tf2::Transform base_T_tcp_pre_yaw = base_T_tcp_grasp;
+        base_T_tcp_pre_yaw.setOrigin(base_T_tcp_grasp.getOrigin() +
+                                     approach_axis * approach_height_);
+
+        geometry_msgs::msg::PoseStamped pose;
+        pose.header.frame_id = planning_frame_;
+        tf2::toMsg(base_T_tcp_pre_yaw, pose.pose);
+
+        publishDebugTF(base_T_object_yaw,
+                       "T_target_object_yaw_" + std::to_string(i));
+        publishDebugTF(base_T_tcp_pre_yaw,
+                       "T_target_tcp_yaw_" + std::to_string(i));
+
+        auto gen = std::make_unique<stages::GeneratePose>(
+            "gen_pose_yaw_" + std::to_string(i));
+        gen->setPose(pose);
+        gen->setMonitoredStage(current_state_ptr);
+
+        auto ik = std::make_unique<stages::ComputeIK>(
+            "compute_ik_yaw_" + std::to_string(i), std::move(gen));
+        ik->setIKFrame(hand_frame_);
+        ik->properties().configureInitFrom(Stage::PARENT, {"group", "ik_frame"});
+        ik->properties().configureInitFrom(Stage::PARENT, {"group", "ik_frame"});
+        ik->properties().configureInitFrom(Stage::INTERFACE, {"target_pose"});   // ← 补这行
+        ik->setMaxIKSolutions(10);
+        ik->setMinSolutionDistance(0.1);
+        ik->setIgnoreCollisions(false);
+
+
+        alt->insert(std::move(ik));
+      }
+      pick->insert(std::move(alt));
+    }
+
+    // 3.3 笛卡尔下降（approach_height > 0 时才需要）
+    if (approach_height_ > 1e-6) {
+      auto approach = std::make_unique<stages::MoveRelative>("approach", cartesian);
+      approach->properties().configureInitFrom(Stage::PARENT, {"group"});
+      approach->setIKFrame(hand_frame_);
+
+      tf2::Transform base_T_object;
+      tf2::fromMsg(target_slot_.pose, base_T_object);
+      tf2::Transform base_T_tcp_grasp = base_T_object * T_tcp_hollow_.inverse();
+      tf2::Vector3 dir_v =
+          -(tf2::Matrix3x3(base_T_tcp_grasp.getRotation()) * tf2::Vector3(0, 0, 1));
+
+      geometry_msgs::msg::Vector3Stamped dir;
+      dir.header.frame_id = planning_frame_;
+      dir.vector.x = dir_v.x();
+      dir.vector.y = dir_v.y();
+      dir.vector.z = dir_v.z();
+
+      approach->setDirection(dir);
+      approach->setMinMaxDistance(approach_height_ * 0.8, approach_height_);
+      pick->insert(std::move(approach));
+    }
+
+
+    // 3.4 附着（触发 GraspPlugin 的 weld）
+    {
+      auto attach = std::make_unique<stages::ModifyPlanningScene>("attach_hollow");
+      attach->attachObject("hollow_cylinder", hand_frame_);
+      pick->insert(std::move(attach));
+    }
+
+    // 3.5 抬起
+    {
+      auto lift = std::make_unique<stages::MoveRelative>("lift", cartesian);
+      lift->properties().configureInitFrom(Stage::PARENT, {"group"});
+      lift->setIKFrame(hand_frame_);
+
+      tf2::Transform base_T_object;
+      tf2::fromMsg(target_slot_.pose, base_T_object);
+      tf2::Vector3 z_axis =
+          tf2::Matrix3x3(base_T_object.getRotation()).getColumn(2).normalized();
+
+      const double kRetreat = k_retreat_;
+      tf2::Vector3 toward_base(-base_T_object.getOrigin().x(),
+                               -base_T_object.getOrigin().y(), 0.0);
+      if (toward_base.length() > 1e-6)
+        toward_base.normalize();
+      else
+        toward_base.setZero();
+      tf2::Vector3 dir_v = (z_axis + toward_base * kRetreat).normalized();
+
+      geometry_msgs::msg::Vector3Stamped dir;
+      dir.header.frame_id = planning_frame_;
+      dir.vector.x = dir_v.x();
+      dir.vector.y = dir_v.y();
+      dir.vector.z = dir_v.z();
+
+      lift->setDirection(dir);
+      lift->setMinMaxDistance(lift_height_ * 0.95, lift_height_);
+      pick->insert(std::move(lift));
+    }
+
+    task.add(std::move(pick));
   }
-  task.add(std::move(pick));
-  }
+
   return task;
 }
 
