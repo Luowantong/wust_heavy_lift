@@ -32,7 +32,13 @@ ros2 launch launch/exchange_mode.launch.py
 | `new_wust` | (0.40, 0, 0.28) | (0.40, 0, 0.20) |
 | `wust_heavy_lift` | (0.34, 0, 0.28) | (0.34, 0, 0.20) |
 
-两个模型的末端都是真空吸盘（`vacuum_tcp` → `LINK_TCP`），抓取时吸盘原点压在**单元顶面中心**，单元中心在吸盘正下方 7.5 cm。
+两个模型的末端抓取点都是 `LINK_TCP`（URDF 里的 `vacuum_tcp` fixed joint）。单元相对 TCP 的位姿由 `tcp_hollow` 参数决定，当前两个模型都配置为：
+
+```yaml
+tcp_hollow: {roll: 0.0, pitch: -1.5708, yaw: 0.0, x: 0.0, y: 0.0, z: 0.0}
+```
+
+即 `T_tcp_hollow = Ry(-90°)`、原点重合：**单元中心就是 LINK_TCP 原点**，单元轴线沿 TCP 的 -X（侧抓）。换抓取方式（顶抓/侧抓）只改这个参数，不用动 URDF。
 
 ### 运行
 
@@ -68,17 +74,34 @@ ROS 2 里**后加载的覆盖前面的**，所以模型相关的值必须放在�
 
 - `common.yaml`：触发方式（`auto_start` 等）
 - `pick.yaml` / `place.yaml`：与模型无关的参数（如 `yaw_candidates`）
-- `models/<model>.yaml`：目标坐标、`approach_height`、`lift_height`、`k_retreat`
+- `models/<model>.yaml`：`workcell` 目标坐标、`tcp_hollow`、`approach_height`、`lift_height`、`k_retreat`
 
-### 改目标坐标时要同步的地方
+模型 yaml 顶部的 `/**` 段会同时被 `mtc_*_node` 和 `mujoco_ros2_control` 读取：
 
-1. `mtc/config/models/<model>.yaml` 的 `target_object` / `target_slot`
-2. MJCF 里 `slot` body 的 `pos`
-3. MJCF 里 `hollow_cylinder` body 的 `pos`
-4. MJCF 里 `rest` weld 的 `relpose`
-5. 若同时改了高度，还有 `mtc/include/mtc/common/geometry.hpp` 的 `pre_place_height_`
+- MTC 用它作为规划目标（pick 读 `workcell.object`，place 读 `workcell.slot`）；
+- `GraspPlugin` 在 `init()` 里用它覆盖 MJCF 的 `slot` / `hollow_cylinder` 位置和 `rest` weld，保证仿真里的实物和规划目标一致。
 
-前四项漏改任何一处，都会出现"MoveIt 规划的位置和 MuJoCo 里的实物对不上"。
+### 改目标坐标时只需要改一处
+
+```yaml
+/**:
+  ros__parameters:
+    workcell:
+      object: {x: 0.34, y: 0.0, z: 0.28}
+      slot:   {x: 0.34, y: 0.0, z: 0.20}
+```
+
+改完重启 launch 即可，MJCF 里的 `slot`/`hollow_cylinder`/`rest` 由插件在初始化时同步，不需要再手改 XML。
+
+启动日志里确认参数确实传到了插件：
+
+```
+[GraspPlugin]: workcell from yaml: object=(...) slot=(...)
+```
+
+如果打印的是 `workcell.* 参数不可见`，说明 plugin 的子节点没有继承到这组参数，需要把 `workcell` 段挪到 `wust_arm_bringup/config/mujoco_plugins.yaml`。
+
+唯一仍需手动保持一致的量是 **z 方向**：改高度时同步 `mtc/include/mtc/common/geometry.hpp` 的 `pre_place_height_`（place 的预放置高度）。
 
 ### 已知约束
 

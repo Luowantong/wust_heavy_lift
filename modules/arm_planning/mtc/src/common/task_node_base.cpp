@@ -241,12 +241,19 @@ void TaskNodeBase::onPlanAndExecute(
 }
 
 void TaskNodeBase::loadTargetParams() {
-  const double x     = node_->get_parameter_or(target_prefix_+".x", 0.0);
-  const double y     = node_->get_parameter_or(target_prefix_+".y", 0.0);
-  const double z     = node_->get_parameter_or(target_prefix_+".z", 0.0);
-  const double roll  = node_->get_parameter_or(target_prefix_+".roll", 0.0);
-  const double pitch = node_->get_parameter_or(target_prefix_+".pitch", 0.0);
-  const double yaw   = node_->get_parameter_or(target_prefix_+".yaw", 0.0);
+  // 目标坐标统一由模型 yaml 的 /** 段提供：
+  //   pick 读 workcell.object，place 读 workcell.slot。
+  // MuJoCo 的 GraspPlugin 也从同一组参数里取，保证规划场景和仿真实物一致。
+  const std::string role =
+      (target_prefix_ == "target_object") ? "object" : "slot";
+  const std::string prefix = "workcell." + role;
+
+  const double x     = node_->get_parameter_or(prefix + ".x", 0.0);
+  const double y     = node_->get_parameter_or(prefix + ".y", 0.0);
+  const double z     = node_->get_parameter_or(prefix + ".z", 0.0);
+  const double roll  = node_->get_parameter_or(prefix + ".roll", 0.0);
+  const double pitch = node_->get_parameter_or(prefix + ".pitch", 0.0);
+  const double yaw   = node_->get_parameter_or(prefix + ".yaw", 0.0);
 
   tf2::Quaternion q;
   q.setRPY(roll, pitch, yaw);
@@ -263,9 +270,9 @@ void TaskNodeBase::loadTargetParams() {
   auto_start_delay_    = node_->get_parameter_or("auto_start_delay", 3.0);
 
   RCLCPP_INFO(node_->get_logger(),
-              "target_slot=[%.3f %.3f %.3f] rpy=[%.3f %.3f %.3f] "
+              "workcell.%s=[%.3f %.3f %.3f] rpy=[%.3f %.3f %.3f] "
               "override=%s auto_start=%s",
-              x, y, z, roll, pitch, yaw,
+              role.c_str(), x, y, z, roll, pitch, yaw,
               allow_slot_override_ ? "true" : "false",
               auto_start_ ? "true" : "false");
 }

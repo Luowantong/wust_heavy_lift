@@ -33,7 +33,9 @@ def launch_setup(context, *args, **kwargs):
             r.moveit_config.robot_description,
             ros2_controllers_path,
             os.path.join(get_package_share_directory('wust_arm_bringup'),
-                         'config', 'mujoco_plugins.yaml'),
+                     'config', 'mujoco_plugins.yaml'),
+            os.path.join(get_package_share_directory('mtc'),
+                     'config', 'models', f'{r.spec.model}.yaml'),  
             {"use_sim_time": use_sim_time_param}
         ],
         output="screen",

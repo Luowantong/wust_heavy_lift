@@ -1,12 +1,17 @@
+/**:
+  ros__parameters:
+    workcell:
+      object: {x: 0.34, y: 0.0, z: 0.28}
+      slot:   {x: 0.34, y: 0.0, z: 0.20}
+      
 mtc_pick_node:
   ros__parameters:
     yaw_candidates: 1
-    target_object: {x: 0.34, y: 0.0, z: 0.28}
     tcp_hollow: {roll: 0.0, pitch: -1.5708, yaw: 0.0, x: 0.0, y: 0.0, z: 0.0}
     approach_height: 0.0
-    lift_height: 0.05        # 待实测
+    lift_height: 0.05       
     k_retreat: 0.0           
+
 mtc_place_node:
   ros__parameters:
-    target_slot: {x: 0.34, y: 0.0, z: 0.20}
     tcp_hollow: {roll: 0.0, pitch: -1.5708, yaw: 0.0, x: 0.0, y: 0.0, z: 0.0}
