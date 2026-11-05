@@ -1,8 +1,10 @@
 /**:
   ros__parameters:
     workcell:
-      object: {x: 0.34, y: 0.0, z: 0.28}
-      slot:   {x: 0.34, y: 0.0, z: 0.20}
+      # 物体/插槽都支持任意姿态：roll/pitch/yaw 单位是弧度（URDF rpy 约定）。
+      # 物体在插槽里时，两者的姿态应保持一致。
+      object: {x: 0.34, y: 0.0, z: 0.28, roll: 0.0, pitch: 0.3, yaw: 0.0}
+      slot:   {x: 0.34, y: 0.0, z: 0.20, roll: 0.0, pitch: 0.3, yaw: 0.0}
       
 mtc_pick_node:
   ros__parameters:

@@ -87,11 +87,16 @@ ROS 2 里**后加载的覆盖前面的**，所以模型相关的值必须放在�
 /**:
   ros__parameters:
     workcell:
-      object: {x: 0.34, y: 0.0, z: 0.28}
-      slot:   {x: 0.34, y: 0.0, z: 0.20}
+      object: {x: 0.34, y: 0.0, z: 0.28, roll: 0.0, pitch: 0.0, yaw: 0.0}
+      slot:   {x: 0.34, y: 0.0, z: 0.20, roll: 0.0, pitch: 0.0, yaw: 0.0}
 ```
 
-改完重启 launch 即可，MJCF 里的 `slot`/`hollow_cylinder`/`rest` 由插件在初始化时同步，不需要再手改 XML。
+`roll/pitch/yaw` 是 URDF rpy 约定、单位弧度。位置和姿态都会被 MTC 和 GraspPlugin 同时读取：
+
+- MTC 用它生成 pick/place 的 6-DoF 目标；
+- GraspPlugin 用它覆盖 MJCF 的 `slot` body、`hollow_cylinder` body/freejoint 和 `rest` weld 的位置 + 四元数。
+
+所以 slot 朝向任意角度时，只需要改这里的 rpy。注意：物体在插槽里时，`object` 的**姿态**应与 `slot` 一致，位置应满足 `object = slot + R_slot · (0, 0, 0.08)`（竖直时就是 z 差 8 cm）；否则物体会和销钉错开。
 
 启动日志里确认参数确实传到了插件：
 
