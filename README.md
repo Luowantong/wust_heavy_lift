@@ -1,4 +1,4 @@
-# WUST Arm Robot
+# WUST Heavy Lift
 
 RoboMaster 工程机器人软件仓库，采用多任务模块化架构。
 
