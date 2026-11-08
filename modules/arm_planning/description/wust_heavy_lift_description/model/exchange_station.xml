@@ -26,7 +26,7 @@
     <body name="O_frame" pos="0 0 0">
       <!-- E 是兑换站坐标系（12 个关键点的 ring 原点）。先放在 (0.40, 0, 0.30)，
            让站体落在机械臂可达范围内；实际工位按需要调 pos / quat。 -->
-      <body name="E" pos="0.40 0.15 0.30" quat="0 0 0 1">
+      <body name="E" pos="-0.30 0.15 0.30" quat="1 0 0 0">
         <!-- Station body -->
         <geom type="mesh" mesh="ex_sta_dark" euler="3.14 0 -1.57" rgba="0.05 0.05 0.05 1" contype="0" conaffinity="0"/>
         <geom type="mesh" mesh="ex_sta_glow" euler="3.14 0 -1.57" rgba="1.0 1.0 1.0 1.0" contype="0" conaffinity="0" mass="0"/>

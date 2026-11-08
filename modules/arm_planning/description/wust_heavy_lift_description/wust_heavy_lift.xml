@@ -30,8 +30,8 @@
   </asset>
   <worldbody>
     <camera name="exchange_cam"
-        pos="0.00 0.15 1.10"
-        quat="0.668585 0.230204 -0.230204 -0.668585"
+        pos="0.00 -0.35 0.95"
+        quat="0.846041 0.417909 0.146595 0.296775"
         fovy="50"
         resolution="1280 720"
         mode="fixed"/>

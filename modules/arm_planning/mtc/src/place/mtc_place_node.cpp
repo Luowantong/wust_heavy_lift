@@ -25,43 +25,6 @@ void MTCTaskNode::setupPlanningScene(
   psi.applyAttachedCollisionObject(detach);
   // 清理场景
   psi.removeCollisionObjects({"slot_base", "slot_cylinder", "hollow_cylinder"});
-  // ---------- 确认 slot_pose_stamped 已经在 base_link 下 ----------
-  geometry_msgs::msg::PoseStamped slot_pose = slot_pose_stamped;
-  slot_pose.header.frame_id = planning_frame_; // 强制 frame_id 为 base_link
-
-  // ---------- 1. 底座碰撞体 ----------
-  moveit_msgs::msg::CollisionObject base;
-  base.id = "slot_base";
-  base.header.frame_id = planning_frame_;
-  base.primitives.resize(1);
-  base.primitives[0].type = shape_msgs::msg::SolidPrimitive::BOX;
-  base.primitives[0].dimensions = {slot_base_square_size, slot_base_square_size,
-                                   slot_base_height};
-  base.pose = slot_pose.pose;
-  base.operation = base.ADD;
-  psi.applyCollisionObject(base);
-
-  // ---------- 2. 圆柱碰撞体 ----------
-  moveit_msgs::msg::CollisionObject cylinder;
-  cylinder.id = "slot_cylinder";
-  cylinder.header.frame_id = planning_frame_;
-  cylinder.primitives.resize(1);
-  cylinder.primitives[0].type = shape_msgs::msg::SolidPrimitive::CYLINDER;
-  cylinder.primitives[0].dimensions = {slot_cylinder_height,
-                                       slot_cylinder_radius};
-
-  // 使用 tf2::Transform 计算圆柱相对于底座的偏移，避免坐标系偏移导致的误差
-  tf2::Transform tf_base, tf_offset, tf_cylinder;
-  tf2::fromMsg(slot_pose.pose, tf_base); // 底座位姿
-  tf_offset.setIdentity();
-  tf_offset.setOrigin(tf2::Vector3(
-      0, 0, slot_base_height / 2.0 + slot_cylinder_height / 2.0)); // z 偏移
-  tf_cylinder = tf_base * tf_offset; // 底座+偏移
-
-  cylinder.pose = tfToPose(tf_cylinder);
-  cylinder.operation = cylinder.ADD;
-  psi.applyCollisionObject(cylinder);
-
   // ---------- 3. 附着 hollow_cylinder ----------
   moveit_msgs::msg::CollisionObject hollow;
   hollow.id = "hollow_cylinder";
@@ -213,12 +176,8 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
     {
       auto allow_collision = std::make_unique<stages::ModifyPlanningScene>(
           "allow_collision_for_insert");
-      std::vector<std::string> slot_objects = {"slot_cylinder", "slot_base"};
-      allow_collision->allowCollisions("hollow_cylinder", slot_objects, true);
       std::vector<std::string> gripper_links = {
           "link1", "link2", "link3", "link4", "link5", "link6", "link7", hand_frame_};
-      allow_collision->allowCollisions("slot_cylinder", gripper_links, true);
-      allow_collision->allowCollisions("slot_base",     gripper_links, true);
 
       place->insert(std::move(allow_collision));
     }
@@ -229,12 +188,11 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
           std::make_unique<stages::MoveRelative>("linear_insert", cartesian);
       insert->properties().configureInitFrom(Stage::PARENT, {"group"});
       insert->setIKFrame("hollow_cylinder");
-      // 根据target_slot_计算插入方向：沿着插槽的负Z轴方向插入
       tf2::Quaternion q;
       tf2::fromMsg(target_slot_.pose.orientation, q);
       tf2::Matrix3x3 R(q);
-      tf2::Vector3 z_axis = R.getColumn(2);
-      tf2::Vector3 insert_dir = -z_axis.normalized();
+      //tf2::Vector3 z_axis = R.getColumn(2);
+      tf2::Vector3 insert_dir = -R.getColumn(0).normalized();
       geometry_msgs::msg::Vector3Stamped dir;
       dir.header.frame_id = planning_frame_;
       dir.vector.x = insert_dir.x();
@@ -243,7 +201,7 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
 
       insert->setDirection(dir);
       // 预放置点(物体中心 z=0.33) → 就位(0.28)，行程 5 cm
-      insert->setMinMaxDistance(0.09, 0.105);
+      insert->setMinMaxDistance(pre_place_height_ * 0.8, pre_place_height_);
       place->insert(std::move(insert));
     }
     // 3.4 添加物体
@@ -333,11 +291,9 @@ bool MTCTaskNode::computeTargetTCP(tf2::Transform &base_T_tcp,
   tf2::fromMsg(target_slot_.pose, base_T_slot);
   // slot -> hollow
   tf2::Transform slot_T_hollow;
-  slot_T_hollow.setOrigin({0, 0, pre_place_height_});
+  slot_T_hollow.setOrigin({-0.08 + pre_place_height_, 0.0, 0.0});
   tf2::Quaternion q;
-  // 物体的 z 朝上，和 pick 的抓取约定一致；若绕 x 转 180°，
-  // hollow_T_tcp 会把 TCP 放到物体下方 7.5cm，直接撞进兑换柱。
-  q.setRPY(0, 0, 0);
+  q.setRPY(0.0, -M_PI / 2, 0.0);   // hollow z 轴 → 柱子 -x
   slot_T_hollow.setRotation(q);
   // base -> hollow
   base_T_hollow = base_T_slot * slot_T_hollow;
