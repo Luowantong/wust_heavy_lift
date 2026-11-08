@@ -1,0 +1,49 @@
+<mujoco model="exchange_station">
+  <!--
+    固定兑换站（从 HKUST ENTERPRIZE 的 exchange_station.xml 精简而来）：
+    - 去掉了 6 个 level_* 调节关节、M/P/Q 装配轴和全部 actuator
+    - mesh 路径改成相对顶层 <compiler meshdir="meshes">
+    - E 的位姿就是站体坐标系；需要挪位置时只改下面的 pos / quat
+  -->
+
+  <asset>
+    <!-- exchange.obj split parts (Blender 5.1 export, units: meters) -->
+    <mesh file="exchange_station/tech/exchange_station_dark.obj" name="ex_sta_dark"/>
+    <mesh file="exchange_station/tech/exchange_station_glow.obj" name="ex_sta_glow"/>
+    <mesh file="exchange_station/tech/exchange_column_dark.obj"      name="ex_col_dark"/>
+    <mesh file="exchange_station/tech/exchange_column_screw.obj"     name="ex_col_screw"/>
+    <mesh file="exchange_station/tech/exchange_column_light_red.obj" name="ex_col_light_red"/>
+    <mesh file="exchange_station/tech/exchange_column_main_red.obj"  name="ex_col_main_red"/>
+    <mesh file="exchange_station/tech/exchange_column_em_base.obj"   name="ex_col_em_base"/>
+    <mesh file="exchange_station/tech/exchange_column_em_ring.obj"   name="ex_col_em_ring"/>
+  </asset>
+
+  <default>
+    <geom contype="0" conaffinity="0" mass="0.01" rgba="0.5 0.5 0.5 1"/>
+  </default>
+
+  <worldbody>
+    <body name="O_frame" pos="0 0 0">
+      <!-- E 是兑换站坐标系（12 个关键点的 ring 原点）。先放在 (0.40, 0, 0.30)，
+           让站体落在机械臂可达范围内；实际工位按需要调 pos / quat。 -->
+      <body name="E" pos="0.40 0.15 0.30" quat="0 0 0 1">
+        <!-- Station body -->
+        <geom type="mesh" mesh="ex_sta_dark" euler="3.14 0 -1.57" rgba="0.05 0.05 0.05 1" contype="0" conaffinity="0"/>
+        <geom type="mesh" mesh="ex_sta_glow" euler="3.14 0 -1.57" rgba="1.0 1.0 1.0 1.0" contype="0" conaffinity="0" mass="0"/>
+        <geom name="ex_col_screw"    type="mesh" mesh="ex_col_screw"    euler="3.14 0 -1.57" rgba="0.50 0.50 0.50 1" mass="0" contype="0" conaffinity="0"/>
+        <geom name="ex_col_main_red" type="mesh" mesh="ex_col_main_red" euler="3.14 0 -1.57" rgba="0.90 0.10 0.10 1" mass="0" contype="0" conaffinity="0"/>
+
+        <!-- Column / pillar（去掉装配关节后为刚性连接） -->
+        <body name="M" pos="-0.169 0 0">
+          <geom name="M_step3_mass" type="sphere" size="0.005" pos="0.169 0 0" rgba="1 0 0 0" mass="0.1"/>
+          <body name="pillar_bottom" pos="0.169 0 0">
+            <geom name="ex_col_dark"      type="mesh" mesh="ex_col_dark"      euler="3.14 0 -1.57" rgba="0.05 0.05 0.05 1" mass="0.005"/>
+            <geom name="ex_col_light_red" type="mesh" mesh="ex_col_light_red" euler="3.14 0 -1.57" rgba="0.90 0.10 0.10 1" mass="0" contype="0" conaffinity="0"/>
+            <geom name="ex_col_em_base"   type="mesh" mesh="ex_col_em_base"   euler="3.14 0 -1.57" rgba="0.15 0.08 0.03 0.7" mass="0" contype="0" conaffinity="0"/>
+            <geom name="ex_col_em_ring"   type="mesh" mesh="ex_col_em_ring"   euler="3.14 0 -1.57" rgba="0.41 0.41 0.41 1" mass="0" contype="0" conaffinity="0"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>

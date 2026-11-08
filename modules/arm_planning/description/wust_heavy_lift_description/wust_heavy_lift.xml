@@ -1,5 +1,6 @@
 <mujoco model="wust_heavy_lift">
   <compiler angle="radian" meshdir="meshes" />
+  <include file="model/exchange_station.xml" />
   <option timestep="0.002" iterations="50" solver="Newton" tolerance="1e-6" />
   <default>
     <default class="visual">
@@ -28,6 +29,12 @@
     <material name="ground_plane_material" texture="ground_plane_texture" texrepeat="50 50" reflectance="0.1" />
   </asset>
   <worldbody>
+    <camera name="exchange_cam"
+        pos="0.00 0.15 1.10"
+        quat="0.668585 0.230204 -0.230204 -0.668585"
+        fovy="50"
+        resolution="1280 720"
+        mode="fixed"/>
     <!-- 以下三块与新模型无关，从 new_wust.xml 照搬：先保证 GraspPlugin 能加载 -->
     <body name="slot" pos="0.34 0.0 0.2">
       <geom name="slot_base" type="box" size="0.05 0.05 0.005"/>

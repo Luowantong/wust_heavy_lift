@@ -32,6 +32,12 @@ install(DIRECTORY meshes
   DESTINATION share/${PROJECT_NAME}/
 )
 
+# exchange_station.xml（以及后续的 model/ 资源）需要跟着安装，
+# 否则 include file="model/..." 在 install 空间里找不到。
+install(DIRECTORY model
+  DESTINATION share/${PROJECT_NAME}/
+)
+
 install(FILES wust_heavy_lift.xml
   DESTINATION share/${PROJECT_NAME}/
 )

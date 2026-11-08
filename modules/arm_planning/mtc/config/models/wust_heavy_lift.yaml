@@ -8,7 +8,7 @@
       
 mtc_pick_node:
   ros__parameters:
-    yaw_candidates: 1
+    yaw_candidates: 3
     tcp_hollow: {roll: 0.0, pitch: -1.5708, yaw: 0.0, x: 0.0, y: 0.0, z: 0.0}
     approach_height: 0.0
     lift_height: 0.05       

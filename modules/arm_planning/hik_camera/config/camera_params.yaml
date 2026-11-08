@@ -2,11 +2,11 @@
   ros__parameters:
     # --- 数据输入控制 ---
     # 模式选择: "camera" (海康相机), "video" (读取本地mp4/avi), "image" (读取单张图片)
-    input_type: "video"
+    input_type: "image"
     
     # 本地文件路径 (仅当 input_type 为 video 或 image 时生效)
     # 支持绝对路径或在启动脚本中处理
-    file_path: "/home/auauau/wust_arm_7axis_ws/raw_video/engineering.mp4"
+    file_path: "/home/lwt/RM26_engineer_exchange/dataset_finalversion/images/train/part_0000/data_front_v9.2_compose__frame_000200.jpg"
 
     # --- 相机基础设置 ---
     camera_name: "narrow_stereo"

@@ -3,4 +3,4 @@
     # 触发方式
     auto_start: false
     auto_start_delay: 3.0
-    allow_slot_override: false
+    allow_slot_override: true

@@ -3,3 +3,13 @@
     mujoco_plugins:
       grasp_plugin:
         type: "wust_mujoco_plugins/GraspPlugin"
+      mujoco_camera_plugin:
+        type: "mujoco_ros2_control_plugins/CameraPlugin"
+        camera_publish_rate: 30.0
+        # 相机配置以 MJCF 的 <camera name="..."> 名字作为 key（不是固定的 camera:）
+        exchange_cam:
+          policy: streaming
+          frame_name: exchange_cam_optical
+          info_topic: /exchange_cam/camera_info
+          image_topic: /exchange_cam/image_raw
+          depth_topic: /exchange_cam/depth
