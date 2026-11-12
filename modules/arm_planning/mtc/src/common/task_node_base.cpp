@@ -60,7 +60,8 @@ TaskNodeBase::TaskNodeBase(const rclcpp::NodeOptions &options,
               th_roll, th_pitch, th_yaw, th_x, th_y, th_z);
   
   // 运行时临时覆盖 YAML 里的目标（默认关闭，需 allow_slot_override:=true）
-  if (allow_slot_override_) {
+  // 只给 place 用：pick 的取件位是固定的，不能被兑换站位姿覆盖
+  if (allow_slot_override_ && target_prefix_ == "target_slot") {
     rclcpp::SubscriptionOptions sub_opts;
     sub_opts.callback_group = cb_group_target_;
     slot_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
@@ -133,10 +134,12 @@ void TaskNodeBase::startPlanningPipelineAsync() {
     } catch (const std::exception &e) {
       RCLCPP_ERROR(node_->get_logger(),
                    "Planning pipeline worker exception: %s", e.what());
+      setState(State::FAILED);   // 否则状态永远停在 PLANNING
       task_running_ = false;
     } catch (...) {
       RCLCPP_ERROR(node_->get_logger(),
                    "Planning pipeline worker unknown exception");
+      setState(State::FAILED);
       task_running_ = false;
     }
   });

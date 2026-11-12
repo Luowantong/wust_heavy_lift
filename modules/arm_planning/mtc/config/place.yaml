@@ -1,2 +1,3 @@
 mtc_place_node:
-  ros__parameters: {}
+  ros__parameters:
+    allow_slot_override: true

@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 # RM26 兑矿仿真一键启动：仿真 + 固定相机 TF + 感知节点
-# 用法: bash start_rm26.sh  (或 ./start_rm26.sh)
+# 用法: bash start_rm26.sh [pick|place]   （默认 place）
 # 不用 -u：ROS 的 setup.bash 会引用未设置的 AMENT_* 变量，-u 会误报
 set -eo pipefail
+
+TASK="${1:-place}"
+case "$TASK" in
+  pick|place) ;;
+  *) echo "用法: $0 [pick|place]"; exit 1 ;;
+esac
+export RM26_TASK="$TASK"
 
 # 与 env.sh 同目录，按脚本自身位置加载环境
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,14 +28,16 @@ from launch_ros.actions import Node
 def generate_launch_description():
     bringup = get_package_share_directory('wust_arm_bringup')
 
-    # 1) 仿真 + move_group + rviz + mtc_pick_node
+    # 1) 仿真 + move_group + rviz + MTC 节点（task 决定起 pick 还是 place，
+    #    两者是不同的可执行文件，一次只能起一个）
+    task = os.environ.get('RM26_TASK', 'place')
     sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(bringup, 'launch', 'mujoco_no_hardware.launch.py')
         ),
         launch_arguments={
             'model': 'wust_heavy_lift',
-            'task': 'place',
+            'task': task,
         }.items(),
     )
 

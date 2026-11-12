@@ -107,7 +107,22 @@ bool GraspPlugin::init(rclcpp::Node::SharedPtr node, const mjModel* model_c,
                   "workcell from yaml: object=(%.3f, %.3f, %.3f) rpy=(%.3f, %.3f, %.3f)",
                   obj[0], obj[1], obj[2], obj_rpy[0], obj_rpy[1], obj_rpy[2]);
     }
-  }  
+  }
+
+  // ------------------------------------------------------------------
+  // 松手时要把 rest 焊点重锚到单元当前位姿，这里先记下重锚需要的东西：
+  // hollow 自由关节的 qpos 地址 + rest weld 的初始 relpose（取件位）
+  // ------------------------------------------------------------------
+  model_ = model;
+  const int hollow_id = mj_name2id(model, mjOBJ_BODY, "hollow_cylinder");
+  if (hollow_id >= 0) {
+    hollow_qpos_adr_ = model->jnt_qposadr[model->body_jntadr[hollow_id]];
+  } else {
+    RCLCPP_WARN(node->get_logger(),
+                "GraspPlugin: 找不到 hollow_cylinder，松手重锚不可用");
+  }
+  const int re = rest_eq_id_ * mjNEQDATA;
+  for (int i = 0; i < 7; ++i) rest_relpose0_[i] = model->eq_data[re + 3 + i];
 
   // 订阅 move_group 的附着事件
   sub_ = node->create_subscription<moveit_msgs::msg::AttachedCollisionObject>(
@@ -127,7 +142,19 @@ bool GraspPlugin::init(rclcpp::Node::SharedPtr node, const mjModel* model_c,
 }
 
 void GraspPlugin::pre_step(mjData* data) {
-  if (attached_.load()) {
+  const bool attached = attached_.load();
+
+  // 抓取 → 松开的下降沿：把 rest 焊点锚到单元当前位姿。
+  // 否则 rest 还指着取件位，单元一松手就被拽回工作区。
+  if (attached_prev_ && !attached && model_ && hollow_qpos_adr_ >= 0) {
+    mjtNum* e = model_->eq_data + rest_eq_id_ * mjNEQDATA;
+    const mjtNum* q = data->qpos + hollow_qpos_adr_;
+    for (int i = 0; i < 3; ++i) e[3 + i] = q[i];      // relpose 位置
+    for (int i = 0; i < 4; ++i) e[6 + i] = q[3 + i];  // relpose 四元数
+  }
+  attached_prev_ = attached;
+
+  if (attached) {
     // 抓取时：关 rest，开 grasp
     data->eq_active[rest_eq_id_] = 0;
     data->eq_active[grasp_eq_id_] = 1;
@@ -140,6 +167,12 @@ void GraspPlugin::pre_step(mjData* data) {
 
 void GraspPlugin::on_reset(mjData*) {
   attached_.store(false);
+  attached_prev_ = false;
+  // reset_world 把单元放回 qpos0（取件位），rest 焊点也要回到初始 relpose，
+  // 否则两者打架，单元下一帧会被拉回站体
+  if (!model_) return;
+  mjtNum* e = model_->eq_data + rest_eq_id_ * mjNEQDATA;
+  for (int i = 0; i < 7; ++i) e[3 + i] = rest_relpose0_[i];
 }
 
 void GraspPlugin::cleanup() {

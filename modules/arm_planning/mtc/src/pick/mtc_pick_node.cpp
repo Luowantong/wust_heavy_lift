@@ -116,7 +116,7 @@ moveit::task_constructor::Task MTCPickNode::createTask() {
     auto connect = std::make_unique<stages::Connect>(
         "move_to_pick_area",
         stages::Connect::GroupPlannerVector{{arm_group_, pipeline}});
-    connect->setTimeout(2.0);
+    connect->setTimeout(5.0);   // 从任意当前位姿到侧抓位姿，2 s 偏紧
     connect->properties().configureInitFrom(Stage::PARENT);
     task.add(std::move(connect));
   }
@@ -195,7 +195,9 @@ moveit::task_constructor::Task MTCPickNode::createTask() {
         ik->properties().configureInitFrom(Stage::INTERFACE, {"target_pose"});   // ← 补这行
         ik->setMaxIKSolutions(10);
         ik->setMinSolutionDistance(0.1);
-        ik->setIgnoreCollisions(false);
+        // 与 place 对齐：IK 阶段不判碰撞，抓取时的碰撞由
+        // allow_collision_for_grasp / allow_collision_in_container 放行
+        ik->setIgnoreCollisions(true);
 
 
         alt->insert(std::move(ik));

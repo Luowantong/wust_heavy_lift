@@ -172,6 +172,32 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
       insert->setMinMaxDistance(pre_place_height_ * 0.8, pre_place_height_);
       place->insert(std::move(insert));
     }
+    // 3.4 插入到位后沿站体 +z 向上顶（此时单元还在夹爪上，必须在 detach 之前）
+    //     用独立求解器，避免把 min_fraction=0.5 带进 linear_insert
+    if (push_up_height_ > 1e-6) {
+      auto cartesian_push = std::make_shared<solvers::CartesianPath>();
+      cartesian_push->setStepSize(0.002);
+      cartesian_push->setMinFraction(0.9);
+
+      auto push =
+          std::make_unique<stages::MoveRelative>("push_up", cartesian_push);
+      push->properties().configureInitFrom(Stage::PARENT, {"group"});
+      push->setIKFrame(hand_frame_);
+
+      tf2::Quaternion q;
+      tf2::fromMsg(target_slot_.pose.orientation, q);
+      tf2::Vector3 z_axis = tf2::Matrix3x3(q).getColumn(2).normalized();
+
+      geometry_msgs::msg::Vector3Stamped dir;
+      dir.header.frame_id = planning_frame_;
+      dir.vector.x = z_axis.x();
+      dir.vector.y = z_axis.y();
+      dir.vector.z = z_axis.z();
+
+      push->setDirection(dir);
+      push->setMinMaxDistance(push_up_height_ * 0.95, push_up_height_);
+      place->insert(std::move(push));
+    }
     // 3.5 第二段平移
     // 注意：当前工装是"单元套在柱子上"，横向平移会把单元从柱子上蹭下来，
     // 所以暂不插入这个 stage。启用时用它自己的求解器，别改共享的 cartesian，
@@ -249,8 +275,14 @@ bool MTCTaskNode::computeTargetTCP(tf2::Transform &base_T_tcp,
   tf2::Transform base_T_slot;
   tf2::fromMsg(target_slot_.pose, base_T_slot);
   // slot -> hollow
+  // -0.08          = collar 面（站体局部 x）
+  // insert_offset_ = 单元半长：collar 面到座位中心的距离
+  // pre_place_height_ = 预放置点到座位的插入行程
+  // 预放置时开口端正好在柱尖外侧，走完 pre_place_height_ 后中心落到
+  // -0.08 + insert_offset_ = -0.005 的座位
   tf2::Transform slot_T_hollow;
-  slot_T_hollow.setOrigin({-0.08 + pre_place_height_, 0.0, 0.0});
+  slot_T_hollow.setOrigin(
+      {-0.08 + insert_offset_ + pre_place_height_, 0.0, 0.0});
   tf2::Quaternion q;
   q.setRPY(0.0, -M_PI / 2, 0.0);   // hollow z 轴 → 柱子 -x
   slot_T_hollow.setRotation(q);
