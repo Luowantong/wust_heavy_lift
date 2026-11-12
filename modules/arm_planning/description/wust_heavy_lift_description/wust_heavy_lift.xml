@@ -25,25 +25,26 @@
     <mesh name="link5_visual" file="link5_collision.stl" />
     <mesh name="link6_visual" file="link6_collision.stl" />
     <mesh name="link7_visual" file="link7_collision.stl" />
+    <!-- 真能量单元（机械组 STL，mm；只做视觉，碰撞仍用上面的 hollow 圆柱） -->
+    <mesh name="energy_unit_visual" file="energy_unit/energy_unit.stl" scale="0.001 0.001 0.001" />
     <texture name="ground_plane_texture" type="2d" builtin="checker" mark="edge" rgb1="0.6 0.8 1.0" rgb2="0.6 0.95 0.6" markrgb="0.2 0.2 0.2" width="512" height="512" />
     <material name="ground_plane_material" texture="ground_plane_texture" texrepeat="50 50" reflectance="0.1" />
   </asset>
   <worldbody>
     <camera name="exchange_cam"
-        pos="0.00 -0.35 0.95"
-        quat="0.846041 0.417909 0.146595 0.296775"
+        pos="0.00 -0.35 0.80"
+        quat="0.808711 0.486231 0.170561 0.283681"
         fovy="50"
         resolution="1280 720"
         mode="fixed"/>
-    <!-- 以下三块与新模型无关，从 new_wust.xml 照搬：先保证 GraspPlugin 能加载 -->
-    <body name="slot" pos="0.34 0.0 0.2">
-      <geom name="slot_base" type="box" size="0.05 0.05 0.005"/>
-      <geom name="slot_cylinder" type="cylinder" size="0.018 0.05" pos="0 0 0.055"/>
-    </body>
     <body name="hollow_cylinder" pos="0.34 0.0 0.28">
       <freejoint/>
       <inertial pos="0 0 0" mass="0.1" diaginertia="0.0001 0.0001 0.0001"/>
       <geom name="hollow" type="cylinder" size="0.0325 0.075"/>
+      <!-- 真单元视觉：平移到几何中心、轴心；绕 x 转 -90° 使开口端(+y→+z)朝站体 -->
+      <geom name="energy_unit_visual" type="mesh" mesh="energy_unit_visual" class="visual"
+            pos="-0.0475 -0.04747 0.075" quat="0.7071068 -0.7071068 0 0"
+            rgba="0.85 0.9 0.95 1" />
     </body>
     <geom pos="0 0 0" quat="1 0 0 0" type="mesh" rgba="1 1 1 1" mesh="base_collision" group="3" />
     <geom name="base_visual" class="visual" mesh="base_visual" rgba="1 1 1 1" />
@@ -111,11 +112,9 @@
     <exclude body1="link5" body2="hollow_cylinder" />
     <exclude body1="link6" body2="hollow_cylinder" />
     <exclude body1="link7" body2="hollow_cylinder" />
-    <exclude body1="hollow_cylinder" body2="slot" />
-    <exclude body1="link5" body2="slot" />
-    <exclude body1="link6" body2="slot" />
-    <exclude body1="link7" body2="slot" />
     <exclude body1="link2" body2="link4" />
+    <!-- 能量单元套柱子时与站体碰撞体重叠，排除接触（套接而非碰撞） -->
+    <exclude body1="hollow_cylinder" body2="E" />
   </contact>
   <equality>
     <weld name="rest" body1="world" body2="hollow_cylinder"

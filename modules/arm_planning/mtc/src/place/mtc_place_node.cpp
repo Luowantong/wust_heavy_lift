@@ -23,50 +23,22 @@ void MTCTaskNode::setupPlanningScene(
   detach.object.id = "hollow_cylinder";
   detach.object.operation = detach.object.REMOVE;
   psi.applyAttachedCollisionObject(detach);
-  // 清理场景
-  psi.removeCollisionObjects({"slot_base", "slot_cylinder", "hollow_cylinder"});
-  // ---------- 3. 附着 hollow_cylinder ----------
-  moveit_msgs::msg::CollisionObject hollow;
-  hollow.id = "hollow_cylinder";
-  hollow.header.frame_id = hand_frame_;
-
-  hollow.primitives.resize(1);
-  hollow.primitives[0].type = shape_msgs::msg::SolidPrimitive::CYLINDER;
-  hollow.primitives[0].dimensions = {hollow_cylinder_h, hollow_cylinder_r};
-
-  tf2::Transform tf_hollow = T_tcp_hollow_;
-
-  hollow.pose = tfToPose(tf_hollow);
-  hollow.operation = hollow.ADD;
-
-  geometry_msgs::msg::TransformStamped t;
-  t.header.stamp = node_->get_clock()->now();
-  t.header.frame_id = hand_frame_; // 父坐标系
-  t.child_frame_id = "hollow_cylinder";
-  t.transform.translation.x = tf_hollow.getOrigin().x();
-  t.transform.translation.y = tf_hollow.getOrigin().y();
-  t.transform.translation.z = tf_hollow.getOrigin().z();
-  t.transform.rotation = tf2::toMsg(tf_hollow.getRotation());
-  tf_broadcaster_->sendTransform(t);
-
-  // 附着
+  // ---------- 3. 按抓取约定把 hollow 附着到 hand_frame ----------
+  // 物体相对 hand_frame 的位姿必须用 T_tcp_hollow_（与 pick/仿真 weld 一致），
+  // 不能给世界系固定位姿：MoveIt 会用"当前机器人状态"把它换算到 LINK_TCP 下，
+  // 结果随触发时的手臂姿态漂移（RViz 里单元相对夹爪转 90°）。
   moveit_msgs::msg::AttachedCollisionObject attached;
-  attached.object = hollow;
+  attached.object.id = "hollow_cylinder";
+  attached.object.header.frame_id = hand_frame_;
+  attached.object.primitives.resize(1);
+  attached.object.primitives[0].type = shape_msgs::msg::SolidPrimitive::CYLINDER;
+  attached.object.primitives[0].dimensions = {hollow_cylinder_h, hollow_cylinder_r};
+  attached.object.pose = tfToPose(T_tcp_hollow_);
+  attached.object.operation = moveit_msgs::msg::CollisionObject::ADD;
   attached.link_name = hand_frame_;
   attached.touch_links = {hand_frame_, "link1", "link2", "link3",
-                        "link4", "link5", "link6", "link7"};
+                          "link4", "link5", "link6", "link7"};
   psi.applyAttachedCollisionObject(attached);
-
-  // 等待附着生效
-  std::map<std::string, moveit_msgs::msg::AttachedCollisionObject> objects;
-  int attempts = 0;
-  while (objects.find("hollow_cylinder") == objects.end() && attempts < 5) {
-    rclcpp::sleep_for(std::chrono::milliseconds(100));
-    objects = psi.getAttachedObjects({"hollow_cylinder"});
-    attempts++;
-  }
-  RCLCPP_DEBUG(node_->get_logger(),
-               "Object 'hollow_cylinder' is now attached and visible.");
 }
 
 /* ===================== MTC ===================== */
@@ -100,7 +72,6 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
     current_state_ptr = cs.get();
     task.add(std::move(cs));
   }
-
   // 2. 连接阶段：从当前位置移动到预放置点上方
   {
     auto connect = std::make_unique<stages::Connect>(
@@ -120,15 +91,13 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
     {
       auto alt = std::make_unique<Alternatives>("ik_yaw_alternative");
       place->properties().exposeTo(alt->properties(), {"group", "ik_frame"});
+
       tf2::Transform base_T_tcp, base_T_hollow;
       if (!computeTargetTCP(base_T_tcp, base_T_hollow))
         throw std::runtime_error("target pose compute failed");
 
-      publishDebugTF(base_T_hollow, "T_target_hollow");
-      publishDebugTF(base_T_tcp, "T_target_tcp");
-
       // yaw sampling 参数
-      int n_yaw = 1;               // 备选yaw 个数
+      int n_yaw = 1; // 备选yaw 个数
       double yaw_range = M_PI / 2; // 备选yaw 范围
       tf2::Transform hollow_T_tcp = T_tcp_hollow_.inverse();
       for (int i = 0; i < n_yaw; ++i) {
@@ -200,18 +169,8 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
       dir.vector.z = insert_dir.z();
 
       insert->setDirection(dir);
-      // 预放置点(物体中心 z=0.33) → 就位(0.28)，行程 5 cm
       insert->setMinMaxDistance(pre_place_height_ * 0.8, pre_place_height_);
       place->insert(std::move(insert));
-    }
-    // 3.4 添加物体
-    {
-      auto attach =
-          std::make_unique<stages::ModifyPlanningScene>("attach_slot_objects");
-
-      //attach->attachObject("slot_cylinder", hand_frame_);
-      //attach->attachObject("slot_base", hand_frame_);
-      place->insert(std::move(attach));
     }
     // 3.5 第二段平移
     // 注意：当前工装是"单元套在柱子上"，横向平移会把单元从柱子上蹭下来，

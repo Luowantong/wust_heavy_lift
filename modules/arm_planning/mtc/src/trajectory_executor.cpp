@@ -4,6 +4,7 @@
 #include <moveit/trajectory_processing/time_optimal_trajectory_generation.h>
 #include <moveit_msgs/msg/robot_trajectory.hpp>
 #include <moveit/task_constructor/stage.h>
+#include <moveit/planning_scene/planning_scene.h>
 
 #include <functional>
 #include <utility>
@@ -106,11 +107,14 @@ TrajectoryExecutor::execute(const moveit::task_constructor::SolutionBase &soluti
   // place 任务一开始物体就附着在夹爪上（MoveIt 层面），但 MuJoCo 插件不知道。
   // 若解的第一个 waypoint 已经带着附着体，先补一条抓取事件，
   // 否则插件的 pre_step 会一直激活 rest，把物体钉在原地。
-  if (!leaves.empty() && leaves.front()->trajectory() &&
-      leaves.front()->trajectory()->getFirstWayPoint().hasAttachedBody(weld_object_)) {
+  // 用 MTC 起始场景判断，而不是第一个 waypoint
+  const auto* start = solution.start();
+  if (start && start->scene() &&
+      start->scene()->getCurrentState().hasAttachedBody(weld_object_)) {
     RCLCPP_INFO(node_->get_logger(), "object already attached at start -> grab");
     publishWeld(true);
   }
+  
 
   std::size_t begin = 0;
   bool executed_any = false;

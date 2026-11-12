@@ -40,9 +40,9 @@ def generate_launch_description():
         executable='static_transform_publisher',
         name='exchange_cam_tf',
         arguments=[
-            '--x', '0.00', '--y', '-0.35', '--z', '0.95',
-            '--qx', '-0.846041', '--qy', '-0.296775', '--qz', '0.146595',
-            '--qw', '0.417909',
+            '--x', '0.00', '--y', '-0.35', '--z', '0.80',
+            '--qx', '-0.808711', '--qy', '-0.283681', '--qz', '0.170561',
+            '--qw', '0.486231',
             '--frame-id', 'base', '--child-frame-id', 'exchange_cam_optical',
         ],
     )
