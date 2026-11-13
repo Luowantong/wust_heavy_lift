@@ -1,0 +1,54 @@
+WARNING Thu Nov 12 20:26:54 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_dark.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:26:54 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_glow.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:26:54 2026: obj_decoder: invalid or missi
+
+WARNING Thu Nov 12 20:27:02 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_dark.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:27:02 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_glow.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:27:02 2026: obj_decoder: invalid or missi
+
+WARNING Thu Nov 12 20:34:21 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_dark.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:34:21 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_glow.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:34:21 2026: obj_decoder: invalid or missi
+
+WARNING Thu Nov 12 20:34:28 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_dark.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:34:28 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_glow.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:34:28 2026: obj_decoder: invalid or missi
+
+WARNING Thu Nov 12 20:36:00 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_dark.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:36:00 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_glow.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:36:00 2026: obj_decoder: invalid or missi
+
+WARNING Thu Nov 12 20:36:42 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_dark.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:36:42 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_glow.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:36:42 2026: obj_decoder: invalid or missi
+
+WARNING Thu Nov 12 20:36:53 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_dark.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:36:53 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_glow.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:36:53 2026: obj_decoder: invalid or missi
+
+WARNING Thu Nov 12 20:37:24 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_dark.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:37:24 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_glow.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:37:24 2026: obj_decoder: invalid or missi
+
+WARNING Thu Nov 12 20:38:52 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_dark.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:38:52 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_glow.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:38:52 2026: obj_decoder: invalid or missi
+

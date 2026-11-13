@@ -39,6 +39,36 @@ void MTCTaskNode::setupPlanningScene(
   attached.touch_links = {hand_frame_, "link1", "link2", "link3",
                           "link4", "link5", "link6", "link7"};
   psi.applyAttachedCollisionObject(attached);
+
+  // ---------- 4. 兑换站进规划场景 ----------
+  // 只放柱体（collar / peg / tip / guide），暂不放 E_coll_base：
+  // base 是站体本体的大盒子，全零 home 位时单元就已经埋进去 35~40 mm，
+  // 一旦加进来 CurrentState 直接判碰撞，整个任务起不来；而柱体在 home 位
+  // 离单元/机械臂最近也有 86 mm，可以放心加。
+  // 坐标全部用站体 E 的局部坐标，与 exchange_station.xml 的碰撞体一一对应；
+  // slot_pose_stamped 就是 E 的位姿，所以 CollisionObject.pose 用它，
+  // primitive_poses 保持局部坐标。
+  moveit_msgs::msg::CollisionObject station;
+  station.header.frame_id = planning_frame_;
+  station.id = "exchange_station";
+  station.pose = slot_pose_stamped.pose;
+  tf2::Quaternion qy;
+  qy.setRPY(0.0, M_PI / 2, 0.0);  // 圆柱轴 z → x
+  auto add_cyl = [&](double radius, double length, double x) {
+    shape_msgs::msg::SolidPrimitive prim;
+    prim.type = shape_msgs::msg::SolidPrimitive::CYLINDER;
+    prim.dimensions = {radius, length};
+    tf2::Transform t;
+    t.setOrigin(tf2::Vector3(x, 0.0, 0.0));
+    t.setRotation(qy);
+    station.primitives.push_back(prim);
+    station.primitive_poses.push_back(tfToPose(t));
+  };
+  add_cyl(0.070, 0.102, -0.149);  // E_coll_collar
+  add_cyl(0.018, 0.088, -0.054);  // E_coll_peg
+  add_cyl(0.014, 0.002, 0.001);   // E_coll_tip
+  add_cyl(0.018, 0.010, -0.005);  // 引导锥：10 段阶梯用一段圆柱近似
+  psi.applyCollisionObject(station);
 }
 
 /* ===================== MTC ===================== */
@@ -142,12 +172,12 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
     }
 
     // 3.2 插入时允许碰撞（放在 IK 之后：此时容器是正向计算的，编辑不会被反转）
+    // 站体已经进规划场景，接近段（move_to_place_area）会绕着它走；
+    // 这里只放行"单元 ↔ 站体"这一对，让 linear_insert 能真的套进去。
     {
       auto allow_collision = std::make_unique<stages::ModifyPlanningScene>(
           "allow_collision_for_insert");
-      std::vector<std::string> gripper_links = {
-          "link1", "link2", "link3", "link4", "link5", "link6", "link7", hand_frame_};
-
+      allow_collision->allowCollisions("hollow_cylinder", "exchange_station", true);
       place->insert(std::move(allow_collision));
     }
 
@@ -275,14 +305,14 @@ bool MTCTaskNode::computeTargetTCP(tf2::Transform &base_T_tcp,
   tf2::Transform base_T_slot;
   tf2::fromMsg(target_slot_.pose, base_T_slot);
   // slot -> hollow
-  // -0.08          = collar 面（站体局部 x）
-  // insert_offset_ = 单元半长：collar 面到座位中心的距离
+  // slot_collar_x  = 兑换柱法兰面（站体局部 x，实测 -0.098）
+  // insert_offset_ = 单元半长：法兰面到座位中心的距离（0.075）
   // pre_place_height_ = 预放置点到座位的插入行程
-  // 预放置时开口端正好在柱尖外侧，走完 pre_place_height_ 后中心落到
-  // -0.08 + insert_offset_ = -0.005 的座位
+  // 座位中心 = slot_collar_x + insert_offset_ = -0.023，此时单元开口端法兰
+  // 正好顶在 collar 面上；预放置点再往外退 pre_place_height_。
   tf2::Transform slot_T_hollow;
   slot_T_hollow.setOrigin(
-      {-0.08 + insert_offset_ + pre_place_height_, 0.0, 0.0});
+      {slot_collar_x + insert_offset_ + pre_place_height_, 0.0, 0.0});
   tf2::Quaternion q;
   q.setRPY(0.0, -M_PI / 2, 0.0);   // hollow z 轴 → 柱子 -x
   slot_T_hollow.setRotation(q);

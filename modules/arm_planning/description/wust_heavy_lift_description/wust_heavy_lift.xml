@@ -25,7 +25,7 @@
     <mesh name="link5_visual" file="link5_collision.stl" />
     <mesh name="link6_visual" file="link6_collision.stl" />
     <mesh name="link7_visual" file="link7_collision.stl" />
-    <!-- 真能量单元（机械组 STL，mm；只做视觉，碰撞仍用上面的 hollow 圆柱） -->
+    <!-- 真能量单元（机械组 STL，mm；只做视觉，碰撞用下面的 16 段孔壁） -->
     <mesh name="energy_unit_visual" file="energy_unit/energy_unit.stl" scale="0.001 0.001 0.001" />
     <texture name="ground_plane_texture" type="2d" builtin="checker" mark="edge" rgb1="0.6 0.8 1.0" rgb2="0.6 0.95 0.6" markrgb="0.2 0.2 0.2" width="512" height="512" />
     <material name="ground_plane_material" texture="ground_plane_texture" texrepeat="50 50" reflectance="0.1" />
@@ -40,7 +40,32 @@
     <body name="hollow_cylinder" pos="0.34 0.0 0.28">
       <freejoint/>
       <inertial pos="0 0 0" mass="0.1" diaginertia="0.0001 0.0001 0.0001"/>
-      <geom name="hollow" type="cylinder" size="0.0325 0.075"/>
+      <!-- 碰撞模型：真单元是空心管，MuJoCo 网格碰撞取凸包会把内孔填死，
+           所以用 16 个 box 围出内径 Ø39.8 的孔壁。开口端在 body +z，
+           孔深 105 mm（z 从 +0.075 到 -0.030），以下是实心。
+           兑换柱 Ø36、孔 Ø39.8 → 单边间隙 1.9 mm，靠接触导正。 -->
+      <geom name="hollow_wall_0"  type="box" pos="0.02620 0.00000 0.02250" size="0.00630 0.00646 0.05250" quat="1.000000 0 0 0.000000" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_1"  type="box" pos="0.02421 0.01003 0.02250" size="0.00630 0.00646 0.05250" quat="0.980785 0 0 0.195090" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_2"  type="box" pos="0.01853 0.01853 0.02250" size="0.00630 0.00646 0.05250" quat="0.923880 0 0 0.382683" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_3"  type="box" pos="0.01003 0.02421 0.02250" size="0.00630 0.00646 0.05250" quat="0.831470 0 0 0.555570" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_4"  type="box" pos="0.00000 0.02620 0.02250" size="0.00630 0.00646 0.05250" quat="0.707107 0 0 0.707107" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_5"  type="box" pos="-0.01003 0.02421 0.02250" size="0.00630 0.00646 0.05250" quat="0.555570 0 0 0.831470" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_6"  type="box" pos="-0.01853 0.01853 0.02250" size="0.00630 0.00646 0.05250" quat="0.382683 0 0 0.923880" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_7"  type="box" pos="-0.02421 0.01003 0.02250" size="0.00630 0.00646 0.05250" quat="0.195090 0 0 0.980785" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_8"  type="box" pos="-0.02620 0.00000 0.02250" size="0.00630 0.00646 0.05250" quat="0.000000 0 0 1.000000" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_9"  type="box" pos="-0.02421 -0.01003 0.02250" size="0.00630 0.00646 0.05250" quat="-0.195090 0 0 0.980785" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_10" type="box" pos="-0.01853 -0.01853 0.02250" size="0.00630 0.00646 0.05250" quat="-0.382683 0 0 0.923880" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_11" type="box" pos="-0.01003 -0.02421 0.02250" size="0.00630 0.00646 0.05250" quat="-0.555570 0 0 0.831470" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_12" type="box" pos="-0.00000 -0.02620 0.02250" size="0.00630 0.00646 0.05250" quat="-0.707107 0 0 0.707107" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_13" type="box" pos="0.01003 -0.02421 0.02250" size="0.00630 0.00646 0.05250" quat="-0.831470 0 0 0.555570" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_14" type="box" pos="0.01853 -0.01853 0.02250" size="0.00630 0.00646 0.05250" quat="-0.923880 0 0 0.382683" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <geom name="hollow_wall_15" type="box" pos="0.02421 -0.01003 0.02250" size="0.00630 0.00646 0.05250" quat="-0.980785 0 0 0.195090" contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <!-- 孔底端板：柱尖顶到 z=-0.030 就到底了 -->
+      <geom name="hollow_bore_bottom" type="cylinder" pos="0 0 -0.034" size="0.0199 0.004"
+            contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
+      <!-- 孔以下的实心部分 -->
+      <geom name="hollow_back" type="cylinder" pos="0 0 -0.0525" size="0.0325 0.0225"
+            contype="1" conaffinity="1" rgba="0.8 0.5 0.2 0.35"/>
       <!-- 真单元视觉：平移到几何中心、轴心；绕 x 转 -90° 使开口端(+y→+z)朝站体 -->
       <geom name="energy_unit_visual" type="mesh" mesh="energy_unit_visual" class="visual"
             pos="-0.0475 -0.04747 0.075" quat="0.7071068 -0.7071068 0 0"
@@ -48,37 +73,41 @@
     </body>
     <geom pos="0 0 0" quat="1 0 0 0" type="mesh" rgba="1 1 1 1" mesh="base_collision" group="3" />
     <geom name="base_visual" class="visual" mesh="base_visual" rgba="1 1 1 1" />
-    <body name="link1" pos="0.0085 0.0481 0.21">
+    <!-- gravcomp="1"：模拟真实控制器的重力补偿（电控组确认有）。
+         不加的话 kp=300 的纯 PD 稳态会下沉 17 mm / 2.6°，远超兑换柱
+         1.9 mm / 1° 的插入容差，place 会被顶飞。只给连杆加，不给
+         hollow_cylinder 加——负载重量本来就该压在臂上。 -->
+    <body name="link1" gravcomp="1" pos="0.0085 0.0481 0.21">
       <inertial pos="0.00204172 0.0460268 -0.00160657" quat="0.995475 0.0237798 0.0799534 0.0455196" mass="0.760718" diaginertia="0.00120542 0.000939196 0.000802077" />
       <joint name="joint1" range="-3.14 3.14" axis="0 1 0" />
       <geom type="mesh" rgba="0.898039 0.917647 0.929412 1" mesh="link1_collision" group="3" />
       <geom name="link1_visual" class="visual" mesh="link1_visual" rgba="0.898039 0.917647 0.929412 1" />
-      <body name="link2" pos="0.00345339 0.063 0.0194965">
+      <body name="link2" gravcomp="1" pos="0.00345339 0.063 0.0194965">
         <inertial pos="-0.0377479 0.0865214 -0.017083" quat="0.392559 0.732562 -0.124042 0.542092" mass="0.901543" diaginertia="0.00345509 0.00344525 0.000734194" />
         <joint name="joint2" range="-3.14 3.14" axis="-0.174414 0 -0.984672" />
         <geom pos="0 0 0" quat="1 0 0 0" type="mesh" rgba="0.498039 0.498039 0.498039 1" mesh="link2_collision" group="3" />
         <geom name="link2_visual" class="visual" mesh="link2_visual" rgba="0.498039 0.498039 0.498039 1" />
-        <body name="link3" pos="-0.0450914 0.0957955 -0.0160058">
+        <body name="link3" gravcomp="1" pos="-0.0450914 0.0957955 -0.0160058">
           <inertial pos="-0.0706208 0.108527 -0.0160922" quat="0.922554 0.247232 -0.209012 0.209962" mass="1.35727" diaginertia="0.00443072 0.00411474 0.00211565" />
           <joint name="joint3" range="-3.14 3.14" axis="-0.743141 0.65606 0.131632" />
           <geom type="mesh" rgba="0.898039 0.917647 0.929412 1" mesh="link3_collision" group="3" />
           <geom name="link3_visual" class="visual" mesh="link3_visual" rgba="0.898039 0.917647 0.929412 1" />
-          <body name="link4" pos="-0.0807636 0.103735 0.0358967">
+          <body name="link4" gravcomp="1" pos="-0.0807636 0.103735 0.0358967">
             <inertial pos="-0.0937964 -0.00599206 0.0525041" quat="0.421501 -0.264353 -0.220054 0.839065" mass="1.0337" diaginertia="0.00356994 0.00321267 0.0013896" />
             <joint name="joint4" range="-3.14 3.14" axis="0.585801 0.542805 0.60183" />
             <geom quat="1 0 0 0" type="mesh" rgba="0.65098 0.619608 0.588235 1" mesh="link4_collision" group="3" />
             <geom name="link4_visual" class="visual" mesh="link4_visual" rgba="0.65098 0.619608 0.588235 1" />
-            <body name="link5" pos="-0.139292 -0.0288445 0.116557">
+            <body name="link5" gravcomp="1" pos="-0.139292 -0.0288445 0.116557">
               <inertial pos="-0.0259098 -0.0158338 0.0375458" quat="0.335006 -0.190846 -0.29314 0.874881" mass="0.640844" diaginertia="0.000741047 0.000685696 0.000410058" />
               <joint name="joint5" range="-3.14 3.14" axis="0.519891 0.317985 -0.792842" />
               <geom quat="1 0 0 0" type="mesh" rgba="0.898039 0.917647 0.929412 1" mesh="link5_collision" group="3" />
               <geom name="link5_visual" class="visual" mesh="link5_visual" rgba="0.898039 0.917647 0.929412 1" />
-              <body name="link6" pos="-0.0420614 -0.0306202 0.0421217">
+              <body name="link6" gravcomp="1" pos="-0.0420614 -0.0306202 0.0421217">
                 <inertial pos="-0.0217017 -0.0145416 0.0528691" quat="0.918893 0.114253 -0.0919527 -0.366232" mass="0.52277" diaginertia="0.000663475 0.000496292 0.000424063" />
                 <joint name="joint6" range="-3.14 3.14" axis="0.516782 0.62195 0.588315" />
                 <geom quat="1 0 0 0" type="mesh" rgba="0.65098 0.619608 0.588235 1" mesh="link6_collision" group="3" />
                 <geom name="link6_visual" class="visual" mesh="link6_visual" rgba="0.65098 0.619608 0.588235 1" />
-                <body name="link7" pos="-0.0139529 -0.00840714 0.0409464">
+                <body name="link7" gravcomp="1" pos="-0.0139529 -0.00840714 0.0409464">
                   <inertial pos="-0.0526526 -0.0500268 0.0940701" quat="0.936457 0.0335443 -0.264476 0.227979" mass="1.20651" diaginertia="0.00870711 0.00835738 0.00274769" />
                   <joint name="joint7" range="-3.14 3.14" axis="-0.469961 -0.368303 0.802178" />
                   <geom quat="1 0 0 0" type="mesh" rgba="0.776471 0.756863 0.737255 1" mesh="link7_collision" group="3" />
@@ -113,12 +142,17 @@
     <exclude body1="link6" body2="hollow_cylinder" />
     <exclude body1="link7" body2="hollow_cylinder" />
     <exclude body1="link2" body2="link4" />
-    <!-- 能量单元套柱子时与站体碰撞体重叠，排除接触（套接而非碰撞） -->
-    <exclude body1="hollow_cylinder" body2="E" />
+    <!-- 注意：hollow_cylinder ↔ E 不排除。孔壁(Ø39.8) ↔ 兑换柱(Ø36) 要靠接触
+         导正，孔底 ↔ 柱尖/法兰靠接触限位。站体的 CAD 网格本身 contype=0，
+         真正参与接触的只有 E_coll_collar/peg/tip 和 E_coll_base，
+         而座位处单元末端 (-0.098) 距 E_coll_base (-0.11) 还有 12 mm。 -->
   </contact>
   <equality>
     <weld name="rest" body1="world" body2="hollow_cylinder"
       relpose="0.34 0 0.28 1 0 0 0" active="false"/>
+    <!-- 夹持约束故意留软：solref 默认 0.02 1，20 N 侧向力下约 12 mm 偏移。
+         单元插进柱子时孔壁/法兰会真实顶住，这点柔性让夹爪"让位"，
+         而不是像刚体焊死那样把柱子一起推开。 -->
     <weld name="grasp" body1="link7" body2="hollow_cylinder"
       relpose="-0.096 -0.075 0.159 0.27543 -0.40581 -0.09889 -0.86584" active="false"/>
 </equality>

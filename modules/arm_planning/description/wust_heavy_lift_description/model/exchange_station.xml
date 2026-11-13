@@ -18,6 +18,10 @@
     <mesh file="exchange_station/tech/exchange_column_em_ring.obj"   name="ex_col_em_ring"/>
   </asset>
 
+  <!-- 默认不产生接触：站体/机械臂的 CAD 网格在 home 位就互相重叠（实测 link7
+       穿过 E_coll_base 约 6 cm），一旦让它们参与接触，仿真一开始就会被巨大的
+       约束力顶飞。所以这里保持"默认关闭"，只给真正需要的碰撞代理显式开
+       contype/conaffinity=1。新增几何体时别忘了自己写这两个属性。 -->
   <default>
     <geom contype="0" conaffinity="0" mass="0.01" rgba="0.5 0.5 0.5 1"/>
   </default>
@@ -37,8 +41,46 @@
         <!-- 底座主结构：box -->
         <geom name="E_coll_base" type="box" pos="-0.155 0 0.205" size="0.045 0.225 0.283"
               contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
-        <!-- 柱子：水平圆柱，轴沿 -x -->
-        <geom name="E_coll_pillar" type="cylinder" pos="-0.083 0 0.03" size="0.04 0.085"
+        <!-- 兑换柱（轴 = E 的 x 轴，实测 z=0；按 exchange_column 网格量出来的）：
+               collar 面 x=-0.098 → 半径 0.07 的法兰盘
+               Ø36 轴     x=-0.098 .. -0.010
+               引导锥     x=-0.010 .. 0，Ø28 → Ø36（半角 21.8°）
+               Ø28 尖端   x=0 .. +0.002
+             能量单元从 +x 方向套进来，collar 面挡住单元开口端法兰时坐到位。
+
+             为什么要加引导锥：孔(Ø39.8) 对柱(Ø36) 只有 1.9 mm 径向余量。原来
+             柱端是 Ø28 平头，单元只要偏 1.9~5.9 mm，法兰面就顶在柱端的平面
+             上——法向是纯轴向的，不产生任何对中力，臂继续往前推只会把单元
+             "骑"到柱子上方。换成锥面后，轴向推力会分出一部分径向分力，在
+             10 mm 行程内把单元推回轴心，然后再进 Ø36 段。
+             MuJoCo 没有 cone 图元，用 10 段圆柱阶梯近似（每段 1 mm 长、
+             0.4 mm 半径台阶）；对 0.1 kg 的单元来说与光顺锥面等价。
+             径向捕获范围仍是 19.9-14=5.9 mm（由柱尖半径决定，锥只负责对中）。 -->
+        <geom name="E_coll_collar" type="cylinder" pos="-0.149 0 0" size="0.07 0.051"
+              quat="0.7071 0 0.7071 0" contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
+        <geom name="E_coll_peg" type="cylinder" pos="-0.054 0 0" size="0.018 0.044"
+              quat="0.7071 0 0.7071 0" contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
+        <geom name="E_coll_tip" type="cylinder" pos="0.001 0 0" size="0.014 0.001"
+              quat="0.7071 0 0.7071 0" contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
+        <geom name="E_coll_guide_0" type="cylinder" pos="-0.0095 0 0" size="0.01780 0.0005"
+              quat="0.7071 0 0.7071 0" contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
+        <geom name="E_coll_guide_1" type="cylinder" pos="-0.0085 0 0" size="0.01740 0.0005"
+              quat="0.7071 0 0.7071 0" contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
+        <geom name="E_coll_guide_2" type="cylinder" pos="-0.0075 0 0" size="0.01700 0.0005"
+              quat="0.7071 0 0.7071 0" contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
+        <geom name="E_coll_guide_3" type="cylinder" pos="-0.0065 0 0" size="0.01660 0.0005"
+              quat="0.7071 0 0.7071 0" contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
+        <geom name="E_coll_guide_4" type="cylinder" pos="-0.0055 0 0" size="0.01620 0.0005"
+              quat="0.7071 0 0.7071 0" contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
+        <geom name="E_coll_guide_5" type="cylinder" pos="-0.0045 0 0" size="0.01580 0.0005"
+              quat="0.7071 0 0.7071 0" contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
+        <geom name="E_coll_guide_6" type="cylinder" pos="-0.0035 0 0" size="0.01540 0.0005"
+              quat="0.7071 0 0.7071 0" contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
+        <geom name="E_coll_guide_7" type="cylinder" pos="-0.0025 0 0" size="0.01500 0.0005"
+              quat="0.7071 0 0.7071 0" contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
+        <geom name="E_coll_guide_8" type="cylinder" pos="-0.0015 0 0" size="0.01460 0.0005"
+              quat="0.7071 0 0.7071 0" contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
+        <geom name="E_coll_guide_9" type="cylinder" pos="-0.0005 0 0" size="0.01420 0.0005"
               quat="0.7071 0 0.7071 0" contype="1" conaffinity="1" rgba="0.9 0.2 0.2 0.0"/>
 
         <!-- Column / pillar（去掉装配关节后为刚性连接） -->

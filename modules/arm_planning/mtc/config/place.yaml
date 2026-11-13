@@ -1,3 +1,4 @@
 mtc_place_node:
   ros__parameters:
     allow_slot_override: true
+    push_up_height: 0.0

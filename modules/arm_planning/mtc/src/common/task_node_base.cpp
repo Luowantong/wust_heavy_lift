@@ -107,11 +107,18 @@ void TaskNodeBase::onTargetOverride(
     }
   }
 
-  target_slot_ = p;
+  // 只覆盖位置，姿态继续用 YAML 里配的。
+  // detector 发的是标记块自身坐标系的 solvePnP 朝向，和站体 E 系（x 沿柱子、
+  // z 朝上）没有对齐；而 MTC 的插入方向 -R.col(0)、顶起方向 R.col(2) 都直接
+  // 取 target_slot_.orientation，用视觉姿态会把方向带偏。
+  // 如果以后确认视觉四元数就是 E 的朝向，把下面一行换成 target_slot_ = p; 即可。
+  target_slot_.pose.position = p.pose.position;
+  target_slot_.header = p.header;
   has_target_ = true;
   RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
-                       "target overridden: [%.3f %.3f %.3f]",
-                       p.pose.position.x, p.pose.position.y, p.pose.position.z);
+                       "target overridden (position only): [%.3f %.3f %.3f]",
+                       target_slot_.pose.position.x, target_slot_.pose.position.y,
+                       target_slot_.pose.position.z);
 }
 
 TaskNodeBase::~TaskNodeBase() {

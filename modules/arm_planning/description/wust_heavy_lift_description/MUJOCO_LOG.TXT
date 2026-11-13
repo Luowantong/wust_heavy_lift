@@ -1,0 +1,6 @@
+WARNING Thu Nov 12 20:44:57 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_dark.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:44:57 2026: obj_decoder: invalid or missing face texture coordinate in '/home/lwt/wust_heavy_lift/modules/arm_planning/description/wust_heavy_lift_description/meshes/exchange_station/tech/exchange_station_glow.obj'; discarding texture coordinates
+
+WARNING Thu Nov 12 20:44:57 2026: obj_decoder: invalid or missi
+

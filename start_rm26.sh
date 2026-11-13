@@ -4,6 +4,12 @@
 # 不用 -u：ROS 的 setup.bash 会引用未设置的 AMENT_* 变量，-u 会误报
 set -eo pipefail
 
+# 只在本机做 DDS 发现（env.sh 里也有同样一行，两边都是"可被覆盖的默认值"）。
+# 注意：这个变量是每进程生效的，只写在这里只覆盖本脚本拉起的仿真，
+# 另开终端调服务时那个 shell 也得是 1，否则看不到节点（waiting for service... 卡死）。
+# 想彻底不用管，把下面这行加进 ~/.bashrc。
+export ROS_LOCALHOST_ONLY="${ROS_LOCALHOST_ONLY:-1}"
+
 TASK="${1:-place}"
 case "$TASK" in
   pick|place) ;;
