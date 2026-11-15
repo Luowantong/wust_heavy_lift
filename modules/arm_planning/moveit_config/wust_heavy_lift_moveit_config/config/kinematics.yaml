@@ -3,6 +3,10 @@ main:
   kinematics_solver_search_resolution: 0.005
   kinematics_solver_timeout: 1.0
 
+  # 这里的 mode 只是单独起 move_group 时的默认值。实际运行时由
+  # wust_arm_bringup/launch/common.py 按任务覆盖：place 用 local（同一种子
+  # 稳定落在同一条 IK 分支），pick 用 global（抓取位姿离当前状态远，
+  # local 会 no IK found）。原因见那里 build() 里的注释。
   mode: global
   position_scale: 1.0
   rotation_scale: 0.5

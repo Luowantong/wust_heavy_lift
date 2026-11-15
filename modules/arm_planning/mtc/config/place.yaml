@@ -1,4 +1,22 @@
 mtc_place_node:
   ros__parameters:
-    allow_slot_override: true
+    # 是否用 /exchange_slot/slot_pose（视觉）覆盖 YAML 里的站位。
+    #
+    # 仿真里必须关：place 场景一开局单元就焊在夹爪上、正好挡在站体前面，
+    # 感知估出来的站位偏 (y +9, z -9)mm 左右，插进去会偏心撞柱。
+    # 实测关掉之后插入变干净。
+    #
+    # 真机上要开，并且必须同时打开 target_lock：站位物理上是固定的，
+    # 只在"站体无遮挡"时采一次样就锁死，之后不再跟随。
+    allow_slot_override: false
+
+    # ---- 目标锁定（只在 allow_slot_override 打开时有意义）----
+    # 采样条件全部满足才会锁定，锁定后忽略后续所有感知帧；
+    # 一直锁不上就继续用 YAML 值，任务照常跑。
+    target_lock: true
+    target_lock_frames: 10            # 连续多少帧一致才采纳
+    target_lock_max_spread: 0.002     # 这 10 帧之间的最大互差（m）
+    target_lock_min_distance: 0.35    # 末端离站体超过这个距离才算"无遮挡"（m）
+    target_lock_max_offset: 0.015     # 与 YAML 偏离超过这个值就拒锁（m）
+
     push_up_height: 0.0

@@ -7,6 +7,8 @@
 #include <rclcpp/logging.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <moveit/task_constructor/storage.h>
+#include <algorithm>
+#include <cmath>
 #include <functional>
 #include <vector>
 
@@ -92,8 +94,38 @@ TaskNodeBase::getNodeBaseInterface() {
   return node_->get_node_base_interface();
 }
 
+bool TaskNodeBase::stationUnoccluded(const geometry_msgs::msg::Pose &target) {
+  try {
+    const auto tf = tf_buffer_->lookupTransform(
+        planning_frame_, hand_frame_, tf2::TimePointZero,
+        tf2::durationFromSec(0.05));
+    const auto &t = tf.transform.translation;
+    const double d = std::hypot(std::hypot(t.x - target.position.x,
+                                           t.y - target.position.y),
+                                t.z - target.position.z);
+    if (d >= target_lock_min_distance_)
+      return true;
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 5000,
+                         "target sample skipped: hand %.2fm from station (occluded)", d);
+  } catch (const tf2::TransformException &e) {
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 5000,
+                         "target sample skipped: no TF %s <- %s (%s)",
+                         planning_frame_.c_str(), hand_frame_.c_str(), e.what());
+  }
+  return false;
+}
+
 void TaskNodeBase::onTargetOverride(
     const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+  // 锁定之后后续帧全部忽略：站位物理上是固定的，感知读数的变化几乎全是
+  // 遮挡产物（实测单元挡在站体前时偏 +9/-9mm，放好之后降到 ~6mm）。
+  // 继续跟随只会把噪声带进目标。
+  if (target_lock_ && target_locked_) {
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 5000,
+                         "target already locked, override ignored");
+    return;
+  }
+
   geometry_msgs::msg::PoseStamped p = *msg;
   if (p.header.frame_id.empty())
     p.header.frame_id = planning_frame_;
@@ -112,13 +144,62 @@ void TaskNodeBase::onTargetOverride(
   // z 朝上）没有对齐；而 MTC 的插入方向 -R.col(0)、顶起方向 R.col(2) 都直接
   // 取 target_slot_.orientation，用视觉姿态会把方向带偏。
   // 如果以后确认视觉四元数就是 E 的朝向，把下面一行换成 target_slot_ = p; 即可。
-  target_slot_.pose.position = p.pose.position;
+
+  if (!target_lock_) {  // 旧行为：来什么用什么
+    target_slot_.pose.position = p.pose.position;
+    target_slot_.header = p.header;
+    has_target_ = true;
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
+                         "target overridden (position only): [%.3f %.3f %.3f]",
+                         target_slot_.pose.position.x, target_slot_.pose.position.y,
+                         target_slot_.pose.position.z);
+    return;
+  }
+
+  // ---- 锁定模式：遮挡判据 → 一致性门限 → 与 YAML 的偏移门限 ----
+  if (!stationUnoccluded(p.pose))
+    return;
+
+  target_samples_.emplace_back(p.pose.position.x, p.pose.position.y,
+                               p.pose.position.z);
+  while (target_samples_.size() > static_cast<size_t>(std::max(1, target_lock_frames_)))
+    target_samples_.pop_front();
+  if (target_samples_.size() < static_cast<size_t>(std::max(1, target_lock_frames_)))
+    return;
+
+  tf2::Vector3 mean(0, 0, 0);
+  for (const auto &s : target_samples_)
+    mean += s;
+  mean /= static_cast<double>(target_samples_.size());
+
+  double spread = 0.0;
+  for (const auto &s : target_samples_)
+    spread = std::max(spread, (s - mean).length());
+  if (spread > target_lock_max_spread_)
+    return;  // 还在抖，继续攒
+
+  // 与 YAML 真值偏离过大 → 宁可不锁，也不要用一个明显错的值。
+  // 锁不上就一直用 YAML，任务照常能跑。
+  const tf2::Vector3 yaml_pos(yaml_slot_.pose.position.x,
+                              yaml_slot_.pose.position.y,
+                              yaml_slot_.pose.position.z);
+  const double offset = (mean - yaml_pos).length();
+  if (offset > target_lock_max_offset_) {
+    RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 5000,
+                         "target sample rejected: %.1fmm from YAML (limit %.1fmm)",
+                         offset * 1000, target_lock_max_offset_ * 1000);
+    return;
+  }
+
+  target_slot_.pose.position.x = mean.x();
+  target_slot_.pose.position.y = mean.y();
+  target_slot_.pose.position.z = mean.z();
   target_slot_.header = p.header;
   has_target_ = true;
-  RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
-                       "target overridden (position only): [%.3f %.3f %.3f]",
-                       target_slot_.pose.position.x, target_slot_.pose.position.y,
-                       target_slot_.pose.position.z);
+  target_locked_ = true;
+  RCLCPP_INFO(node_->get_logger(),
+              "target LOCKED at [%.3f %.3f %.3f] (spread %.1fmm, offset %.1fmm from YAML)",
+              mean.x(), mean.y(), mean.z(), spread * 1000, offset * 1000);
 }
 
 TaskNodeBase::~TaskNodeBase() {
@@ -182,9 +263,23 @@ void TaskNodeBase::startPlanningPipeline() {
   bool planned = false;
 
   for (int attempt = 1; attempt <= max_attempts && !planned; ++attempt) {
-    // 失败过的 Task 内部状态不可信，直接重建
-    task_ = createTask();
-    task_.enableIntrospection();
+    // 失败过的 Task 内部状态不可信，直接重建。
+    // createTask() 里会抛"目标相关"的异常（例如 pre-place IK 所有种子都失败），
+    // 这类失败和"规划找不到解"性质相同，必须计入重试次数；
+    // 之前它抛在 try 外面，一次 IK 失败就把整个任务打死，plan_attempts 形同虚设。
+    try {
+      task_ = createTask();
+      task_.enableIntrospection();
+    } catch (const std::exception &e) {
+      RCLCPP_ERROR(node_->get_logger(), "createTask() attempt %d/%d failed: %s",
+                   attempt, max_attempts, e.what());
+      continue;
+    } catch (...) {
+      RCLCPP_ERROR(node_->get_logger(),
+                   "createTask() attempt %d/%d failed: unknown exception",
+                   attempt, max_attempts);
+      continue;
+    }
 
     try {
       task_.init();
@@ -274,8 +369,16 @@ void TaskNodeBase::loadTargetParams() {
   target_slot_.pose.position.z = z;
   target_slot_.pose.orientation = tf2::toMsg(q);
   has_target_ = true;
+  // 存档：后面 onTargetOverride 会覆盖 target_slot_，这里留一份 YAML 真值。
+  // 锁定的一致性门限、以及 IK 全败时的降级目标都用它。
+  yaml_slot_ = target_slot_;
 
   allow_slot_override_ = node_->get_parameter_or("allow_slot_override", false);
+  target_lock_         = node_->get_parameter_or("target_lock", false);
+  target_lock_frames_  = node_->get_parameter_or("target_lock_frames", 10);
+  target_lock_max_spread_   = node_->get_parameter_or("target_lock_max_spread", 0.002);
+  target_lock_min_distance_ = node_->get_parameter_or("target_lock_min_distance", 0.35);
+  target_lock_max_offset_   = node_->get_parameter_or("target_lock_max_offset", 0.015);
   auto_start_          = node_->get_parameter_or("auto_start", false);
   auto_start_delay_    = node_->get_parameter_or("auto_start_delay", 3.0);
 

@@ -113,6 +113,19 @@ def build(model: str, use_sim_time: bool = False, task: str = "place", **overrid
         .to_moveit_configs()
     )
 
+    # pick_ik 的搜索模式按任务切：两个任务对"同一初始状态 -> 哪个解"的要求相反。
+    #  - pick：抓取位姿离当前状态很远（取件位在 base 前方 0.34m），local 只在种子
+    #    附近找，ComputeIK 直接报 "no IK found"，必须用 global。
+    #  - place：预放置点必须和插入段落在**同一条 IK 分支**上。global 每次解出的
+    #    分支是随机的（同一个全零种子 10 次实测 q5 = -0.46/-2.37/-0.45/-2.92/
+    #    +0.46/+0.68），落到 q5≈-3.1 的分支时 joint5 插到一半顶 -3.14 限位，
+    #    CartesianPath 只能完成 9%；local 10/10 稳定在 q5=-0.46 这条能走完
+    #    180mm 的分支上。
+    # move_group 和 MTC 节点各自持有一个 pick_ik 实例（前者跑 CartesianPath /
+    # 抓取的 IK，后者跑 place 里 setFromIK 求预放置点），两边都要设。
+    moveit_config.robot_description_kinematics["robot_description_kinematics"][spec.arm_group]["mode"] = (
+        "local" if task == "place" else "global")
+
     sim = {"use_sim_time": use_sim_time}
 
     robot_state_publisher = Node(

@@ -22,6 +22,7 @@
 
 #include <atomic>
 #include <thread>
+#include <vector>
 
 namespace mtc {
   geometry_msgs::msg::Pose tfToPose(const tf2::Transform &tf);
@@ -37,5 +38,8 @@ protected:
 private:
   bool computeTargetTCP(tf2::Transform &, tf2::Transform &);
   double push_up_height_{0.03};   // 插入到位后沿站体 +z 顶起的距离
+  // 上一次成功的预放置解（关节角度，按 arm_group_ 变量顺序）。
+  // 作为 IK 种子阶梯的第 2 级：跨次运行保持连续性，优先复用同一条分支。
+  std::vector<double> last_pre_place_q_;
 };
 }

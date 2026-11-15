@@ -9,7 +9,9 @@
 #include <rclcpp/logging.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <moveit/task_constructor/storage.h>
+#include <moveit/robot_state/robot_state.h>
 #include <functional>
+#include <map>
 #include <vector>
 
 namespace mtc {
@@ -90,94 +92,131 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
   auto cartesian = std::make_shared<solvers::CartesianPath>();
   // 笛卡尔路径每 5mm 一个 waypoint（1mm 时 waypoint 太多，每个点都要独立解一次 IK）
   cartesian->setStepSize(0.020);
-  cartesian->setMinFraction(0.9);
+  // 插入必须走满全程：0.9 会把"只走 90%"当成成功（实测臂停在离座位 18 mm
+  // 处、joint5 刚好卡在 -3.13 的 IK 分支上），任务却报 DONE。
+  cartesian->setMinFraction(0.98);
   cartesian->setTimeParameterization(
     std::make_shared<trajectory_processing::TimeOptimalTrajectoryGeneration>());
   cartesian->setMaxVelocityScalingFactor(1.0);
   cartesian->setMaxAccelerationScalingFactor(1.0);
   // 1. 获取当前状态
-  Stage *current_state_ptr = nullptr;
   {
     auto cs = std::make_unique<stages::CurrentState>("current");
-    current_state_ptr = cs.get();
     task.add(std::move(cs));
   }
-  // 2. 连接阶段：从当前位置移动到预放置点上方
+  // 2. 预放置点：先按目标算出 TCP 位姿，再用固定种子（全零）求 IK，
+  //    最后用关节空间 MoveTo 精确走到这个构型。
+  //    不能直接 Connect 到姿态：OMPL 的位姿目标会在多解 IK 里随机落点，实测
+  //    会选到 joint5≈-3.13 的翻转分支；该分支做笛卡尔插入时 joint5 在柱内
+  //    120 mm 处顶到 -3.14 限位，CartesianPath 只能完成 90%（Achieved: 0.900000），
+  //    臂停在离座位 18 mm 处而任务仍能报 DONE。用固定种子后走的是
+  //    joint5≈-0.5 → +0.15 的分支，离线 IK 验证全程可行。
+  tf2::Transform base_T_tcp, base_T_hollow;
+  if (!computeTargetTCP(base_T_tcp, base_T_hollow))
+    throw std::runtime_error("target pose compute failed");
+  publishDebugTF(base_T_hollow, "T_target_hollow");
+
   {
-    auto connect = std::make_unique<stages::Connect>(
-        "move_to_place_area",
-        stages::Connect::GroupPlannerVector{{arm_group_, pipeline}});
-    connect->setTimeout(2.0);
-    connect->properties().configureInitFrom(Stage::PARENT);
-    task.add(std::move(connect));
+    const auto &robot_model = task.getRobotModel();
+    const auto *jmg = robot_model->getJointModelGroup(arm_group_);
+    geometry_msgs::msg::PoseStamped pre_pose;
+    pre_pose.header.frame_id = planning_frame_;
+    tf2::toMsg(base_T_tcp, pre_pose.pose);
+
+    // ---- 种子阶梯 ----
+    // 目标锁定之后是确定性的，同一个失败会重复，所以必须换种子，
+    // 只靠 plan_attempts 重试是没用的。
+    // 注意：不能随机撒种子。q5≈-3.1 那条分支插到一半顶 -3.14 限位，
+    // 全零种子是特意挑出来的"能走完 180mm"的分支，扰动必须小到不会换分支。
+    auto zero_seed = [&]() {
+      moveit::core::RobotState s(robot_model);
+      s.setToDefaultValues();
+      return s;
+    };
+
+    std::vector<moveit::core::RobotState> seeds;
+    seeds.push_back(zero_seed());  // 1) 全零：验证过的好分支
+
+    if (!last_pre_place_q_.empty()) {  // 2) 上一次成功的解：跨次运行连续
+      moveit::core::RobotState s = zero_seed();
+      const auto &gvars = jmg->getVariableNames();
+      for (size_t i = 0; i < gvars.size() && i < last_pre_place_q_.size(); ++i)
+        s.setVariablePosition(gvars[i], last_pre_place_q_[i]);
+      seeds.push_back(s);
+    }
+
+    // 3) 全零 + joint5 小扰动：只为了躲开局部优化器的卡点
+    for (double dq : {+0.03, -0.03}) {
+      moveit::core::RobotState s = zero_seed();
+      std::vector<double> qj;
+      s.copyJointGroupPositions(jmg, qj);
+      qj[4] += dq;
+      s.setJointGroupPositions(jmg, qj);
+      seeds.push_back(s);
+    }
+
+    auto try_seeds = [&](const geometry_msgs::msg::Pose &target,
+                         std::vector<double> &q_out) {
+      for (size_t i = 0; i < seeds.size(); ++i) {
+        if (seeds[i].setFromIK(jmg, target, hand_frame_, 0.5)) {
+          seeds[i].copyJointGroupPositions(jmg, q_out);
+          last_pre_place_q_ = q_out;
+          RCLCPP_INFO(node_->get_logger(),
+                      "pre-place IK solved with seed %zu/%zu", i + 1, seeds.size());
+          return true;
+        }
+      }
+      return false;
+    };
+
+    std::vector<double> q;
+    if (!try_seeds(pre_pose.pose, q)) {
+      // 4) 兜底：感知目标不可信时退回 YAML 真值再试一次。
+      //    这一步会完全绕过感知，属于"能用但不可信"，必须大声报出来。
+      RCLCPP_WARN(node_->get_logger(),
+                  "pre-place IK failed on all seeds, falling back to YAML slot");
+      target_slot_.pose = yaml_slot_.pose;
+      if (!computeTargetTCP(base_T_tcp, base_T_hollow) ||
+          !try_seeds(tfToPose(base_T_tcp), q))
+        throw std::runtime_error("pre-place IK failed (perceived and YAML)");
+      publishDebugTF(base_T_hollow, "T_target_hollow");
+      RCLCPP_WARN(node_->get_logger(),
+                  "DEGRADED: this run uses the YAML slot pose, perception bypassed");
+    }
+
+    std::map<std::string, double> goal;
+    const auto &vars = jmg->getVariableNames();
+    for (size_t i = 0; i < vars.size(); ++i)
+      goal[vars[i]] = q[i];
+
+    auto move = std::make_unique<stages::MoveTo>("move_to_pre_place", pipeline);
+    move->properties().configureInitFrom(Stage::PARENT, {"group"});
+    move->setGoal(goal);
+    task.add(std::move(move));
   }
-  
 
   // 3. 放置串行容器
   {
     auto place = std::make_unique<SerialContainer>("place_container");
     task.properties().exposeTo(place->properties(), {"group", "ik_frame"});
-    // 3.1 生成预放置姿态
-    {
-      auto alt = std::make_unique<Alternatives>("ik_yaw_alternative");
-      place->properties().exposeTo(alt->properties(), {"group", "ik_frame"});
-
-      tf2::Transform base_T_tcp, base_T_hollow;
-      if (!computeTargetTCP(base_T_tcp, base_T_hollow))
-        throw std::runtime_error("target pose compute failed");
-
-      // yaw sampling 参数
-      int n_yaw = 1; // 备选yaw 个数
-      double yaw_range = M_PI / 2; // 备选yaw 范围
-      tf2::Transform hollow_T_tcp = T_tcp_hollow_.inverse();
-      for (int i = 0; i < n_yaw; ++i) {
-        const double yaw =
-            (n_yaw > 1) ? (-yaw_range + i * (2 * yaw_range) / (n_yaw - 1)) : 0.0;
-        // hollow yaw rotation
-        tf2::Transform hollow_rot;
-        hollow_rot.setIdentity();
-        tf2::Quaternion q;
-        q.setRPY(0, 0, yaw);
-        hollow_rot.setRotation(q);
-        // new hollow pose
-        tf2::Transform base_T_hollow_yaw = base_T_hollow * hollow_rot;
-        // recompute TCP
-        tf2::Transform base_T_tcp_yaw = base_T_hollow_yaw * hollow_T_tcp;
-        geometry_msgs::msg::PoseStamped pose;
-        pose.header.frame_id = planning_frame_;
-        tf2::toMsg(base_T_tcp_yaw, pose.pose);
-        publishDebugTF(base_T_hollow_yaw,
-                       "T_target_hollow_yaw_" + std::to_string(i));
-        // GeneratePose
-        auto gen = std::make_unique<stages::GeneratePose>("gen_pose_yaw_" +
-                                                          std::to_string(i));
-        gen->setPose(pose);
-        gen->setMonitoredStage(current_state_ptr);
-        // ComputeIK
-        auto ik = std::make_unique<stages::ComputeIK>(
-            "compute_ik_yaw_" + std::to_string(i), std::move(gen));
-        ik->setIKFrame(hand_frame_);
-        ik->properties().configureInitFrom(Stage::PARENT,
-                                           {"group", "ik_frame"});
-        ik->properties().configureInitFrom(Stage::INTERFACE, {"target_pose"});
-        ik->setMaxIKSolutions(10);
-        ik->setMinSolutionDistance(0.1);
-        // 单元是空心的、预放置点上已经套住兑换柱，IK 阶段不判碰撞；
-        // 真正的碰撞由后面的 linear_insert 通过 allow_collision_for_insert 放行。
-        //ik->setIgnoreCollisions(true);
-
-        alt->insert(std::move(ik));
-      }
-      place->insert(std::move(alt));
-    }
 
     // 3.2 插入时允许碰撞（放在 IK 之后：此时容器是正向计算的，编辑不会被反转）
     // 站体已经进规划场景，接近段（move_to_place_area）会绕着它走；
-    // 这里只放行"单元 ↔ 站体"这一对，让 linear_insert 能真的套进去。
+    // 这里放行"单元 ↔ 站体"和"腕部 ↔ 站体"，让 linear_insert 能真的套进去。
+    //
+    // 为什么腕部也要放行：单元和夹爪在碰撞模型里都是实心体。单元插到底时
+    // 柱子（peg，r=18mm）整根在单元内部，夹爪的 collision mesh 又包着单元，
+    // 于是 link7 的网格会罩住 peg 前端。实测插到底位姿 check_state_validity
+    // 报 link7<->exchange_station 深 11.6mm，把 peg 那段 primitive 去掉这个
+    // 接触就消失（collar 去掉仍在）——纯属实心碰撞体的近似，不是真撞。
+    // 后果很具体：最后 0.5mm 的 waypoint 被判碰撞，CartesianPath 只完成
+    // 0.90（162/180mm），臂停在离座位 18mm 处，任务却报 DONE。
     {
       auto allow_collision = std::make_unique<stages::ModifyPlanningScene>(
           "allow_collision_for_insert");
       allow_collision->allowCollisions("hollow_cylinder", "exchange_station", true);
+      allow_collision->allowCollisions("link7", "exchange_station", true);
+      allow_collision->allowCollisions(hand_frame_, "exchange_station", true);
       place->insert(std::move(allow_collision));
     }
 
@@ -199,7 +238,7 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
       dir.vector.z = insert_dir.z();
 
       insert->setDirection(dir);
-      insert->setMinMaxDistance(pre_place_height_ * 0.8, pre_place_height_);
+      insert->setMinMaxDistance(pre_place_height_, pre_place_height_);
       place->insert(std::move(insert));
     }
     // 3.4 插入到位后沿站体 +z 向上顶（此时单元还在夹爪上，必须在 detach 之前）
