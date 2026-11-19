@@ -292,8 +292,10 @@ def _decode_heatmaps(
         if 1 <= x < heatmap_w - 1 and 1 <= y < heatmap_h - 1:
             px += np.sign(float(heatmap[y, x + 1] - heatmap[y, x - 1])) * 0.25
             py += np.sign(float(heatmap[y + 1, x] - heatmap[y - 1, x])) * 0.25
+        # 与训练侧 MSRAHeatmap 解码一致（mmpose keypoints_from_heatmaps）：
+        #   输入坐标 = 热图坐标 × (input_size / heatmap_size)，不加也不减 0.5。
         input_point = np.array(
-            [(px + 0.5) * input_w / heatmap_w, (py + 0.5) * input_h / heatmap_h, 1.0],
+            [px * input_w / heatmap_w, py * input_h / heatmap_h, 1.0],
             dtype=np.float32,
         )
         coordinates[index] = inverse_affine @ input_point
