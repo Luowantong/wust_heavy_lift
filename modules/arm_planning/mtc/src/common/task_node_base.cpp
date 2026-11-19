@@ -2,12 +2,14 @@
 #include "mtc/common/task_node_base.hpp"
 #include "mtc/common/tcp_hollow.hpp"
 #include <geometry_msgs/msg/detail/pose_stamped__struct.hpp>
+#include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/trajectory_processing/time_optimal_trajectory_generation.h>
 #include <moveit/trajectory_processing/time_parameterization.h>
 #include <rclcpp/logging.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <moveit/task_constructor/storage.h>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <functional>
 #include <vector>
@@ -191,12 +193,18 @@ void TaskNodeBase::onTargetOverride(
     return;
   }
 
-  target_slot_.pose.position.x = mean.x();
-  target_slot_.pose.position.y = mean.y();
-  target_slot_.pose.position.z = mean.z();
-  target_slot_.header = p.header;
-  has_target_ = true;
-  target_locked_ = true;
+  {
+    // 写完目标和标志再 release 锁：观察阶段的 wait_for 借此建立 happens-before，
+    // 保证工作线程随后读到的 target_slot_ 是锁定后的值。
+    std::lock_guard<std::mutex> lk(lock_mtx_);
+    target_slot_.pose.position.x = mean.x();
+    target_slot_.pose.position.y = mean.y();
+    target_slot_.pose.position.z = mean.z();
+    target_slot_.header = p.header;
+    has_target_ = true;
+    target_locked_ = true;
+  }
+  lock_cv_.notify_all();
   RCLCPP_INFO(node_->get_logger(),
               "target LOCKED at [%.3f %.3f %.3f] (spread %.1fmm, offset %.1fmm from YAML)",
               mean.x(), mean.y(), mean.z(), spread * 1000, offset * 1000);
@@ -256,17 +264,60 @@ void TaskNodeBase::startPlanningPipeline() {
 
   setState(State::PLANNING);
 
-  setupPlanningScene(target_slot_);         
+  // 观察阶段：必须在 setupPlanningScene 之前。
+  // 锁定会改写 target_slot_，而 setupPlanningScene 拿它建站体碰撞模型；
+  // 放在后面就会出现"碰撞模型按旧目标建、运动按新目标走"。
+  // 只在 place 单独跑/调试时打开（比赛流程 pick→place 手臂本来就在远处）。
+  if (observe_pose_before_place_ && allow_slot_override_ && target_lock_ &&
+      target_prefix_ == "target_slot" && observe_pose_.size() == 7 && !target_locked_) {
+    moveToObservationPose();
+    std::unique_lock<std::mutex> lk(lock_mtx_);
+    const bool locked = lock_cv_.wait_for(
+        lk, std::chrono::duration<double>(observe_lock_timeout_),
+        [this] { return target_locked_.load(); });
+    if (locked)
+      RCLCPP_INFO(node_->get_logger(), "target locked at observation pose");
+    else
+      RCLCPP_WARN(node_->get_logger(),
+                  "target lock timeout (%.1fs), falling back to YAML slot",
+                  observe_lock_timeout_);
+  }
 
   const int max_attempts = static_cast<int>(
       node_->get_parameter_or("plan_attempts", 3));
   bool planned = false;
 
   for (int attempt = 1; attempt <= max_attempts && !planned; ++attempt) {
+    // 1) 目标快照：此后整条管线只认 resolved_target_。
+    //    订阅回调（target_lock 关掉时）继续改 target_slot_ 也串不进来。
+    {
+      std::lock_guard<std::mutex> lk(lock_mtx_);
+      resolved_target_ = target_slot_;
+    }
+
+    // 2) 目标定稿：IK 种子阶梯 + YAML 降级都在这里做完（place 的重写）。
+    //    必须早于 setupPlanningScene——降级会改目标，站体碰撞模型和运动目标
+    //    必须用同一份，否则就是"模型按感知建、运动按 YAML 走"。
+    try {
+      resolveTarget(resolved_target_);
+    } catch (const std::exception &e) {
+      RCLCPP_ERROR(node_->get_logger(), "resolveTarget() attempt %d/%d failed: %s",
+                   attempt, max_attempts, e.what());
+      continue;
+    } catch (...) {
+      RCLCPP_ERROR(node_->get_logger(),
+                   "resolveTarget() attempt %d/%d failed: unknown exception",
+                   attempt, max_attempts);
+      continue;
+    }
+
+    // 3) 场景按最终目标重建。放在循环里：每个 attempt 的目标可能不同
+    //    （降级、或 target_lock 关掉时感知更新），场景必须跟着走。
+    //    三次同步服务调用，开销可忽略。
+    setupPlanningScene(resolved_target_);
+
     // 失败过的 Task 内部状态不可信，直接重建。
-    // createTask() 里会抛"目标相关"的异常（例如 pre-place IK 所有种子都失败），
-    // 这类失败和"规划找不到解"性质相同，必须计入重试次数；
-    // 之前它抛在 try 外面，一次 IK 失败就把整个任务打死，plan_attempts 形同虚设。
+    // createTask() 里若再抛"目标相关"的异常，同样计入重试次数。
     try {
       task_ = createTask();
       task_.enableIntrospection();
@@ -325,6 +376,51 @@ void TaskNodeBase::startPlanningPipeline() {
 
 }
 
+/* ===================== observation pose ===================== */
+
+void TaskNodeBase::moveToObservationPose() {
+  if (observe_pose_.size() != 7) {
+    RCLCPP_WARN(node_->get_logger(),
+                "observe_pose not configured (need 7 joint values), observation skipped");
+    return;
+  }
+
+  // 移动前清掉旧采样：否则移动途中的帧（如果恰好没被遮挡）会混进锁定窗口
+  {
+    std::lock_guard<std::mutex> lk(lock_mtx_);
+    target_samples_.clear();
+  }
+
+  RCLCPP_INFO(node_->get_logger(), "moving to observation pose before planning");
+  moveit::planning_interface::MoveGroupInterface mg(node_, arm_group_);
+  mg.setMaxVelocityScalingFactor(0.5);
+  mg.setMaxAccelerationScalingFactor(0.5);
+  mg.setJointValueTarget(observe_pose_);
+  const auto rc = mg.move();
+  if (rc.val != moveit_msgs::msg::MoveItErrorCodes::SUCCESS) {
+    RCLCPP_WARN(node_->get_logger(),
+                "observation move failed (code %d), keeping current pose", rc.val);
+    return;   // 不中止：锁不上就继续用 YAML，任务照常跑
+  }
+
+  // 距离自检：观察位离站体太近，锁定会被遮挡判据永久拒绝，必须大声报出来
+  try {
+    const auto tf = tf_buffer_->lookupTransform(
+        planning_frame_, hand_frame_, tf2::TimePointZero, tf2::durationFromSec(0.5));
+    const auto &t = tf.transform.translation;
+    const auto &s = yaml_slot_.pose.position;
+    const double d = std::hypot(std::hypot(t.x - s.x, t.y - s.y), t.z - s.z);
+    RCLCPP_INFO(node_->get_logger(),
+                "observation pose reached, TCP %.2fm from station", d);
+    if (d < target_lock_min_distance_ + 0.10)
+      RCLCPP_WARN(node_->get_logger(),
+                  "observation pose too close (%.2fm < %.2fm), lock will likely be rejected",
+                  d, target_lock_min_distance_ + 0.10);
+  } catch (const tf2::TransformException &e) {
+    RCLCPP_WARN(node_->get_logger(), "observation distance check skipped: %s", e.what());
+  }
+}
+
 /* ===================== trigger & state ===================== */
 
 void TaskNodeBase::onPlanAndExecute(
@@ -341,8 +437,18 @@ void TaskNodeBase::onPlanAndExecute(
     return;
   }
   startPlanningPipelineAsync();
+
+  // 把"这一跑打算用哪个目标"一起回给调用方：感知关掉/锁不上都是静默降级，
+  // 只看 success 是看不出来的。
+  const bool will_observe = observe_pose_before_place_ && allow_slot_override_ &&
+                            target_lock_ && target_prefix_ == "target_slot" &&
+                            observe_pose_.size() == 7 && !target_locked_;
+  const char *src = !allow_slot_override_ ? "yaml (perception off)"
+                    : will_observe      ? "observing"
+                    : target_locked_    ? "locked"
+                                        : "yaml (not locked)";
   response->success = true;
-  response->message = "accepted"; // 结果看 ~/state
+  response->message = std::string("accepted (target=") + src + ")";  // 结果看 ~/state
 }
 
 void TaskNodeBase::loadTargetParams() {
@@ -379,6 +485,11 @@ void TaskNodeBase::loadTargetParams() {
   target_lock_max_spread_   = node_->get_parameter_or("target_lock_max_spread", 0.002);
   target_lock_min_distance_ = node_->get_parameter_or("target_lock_min_distance", 0.35);
   target_lock_max_offset_   = node_->get_parameter_or("target_lock_max_offset", 0.015);
+  // 观察位：place 单独跑时手臂停在 home（实测距 E 0.31 m < min_distance），
+  // 每一帧都会被判"遮挡"，所以规划前先走到离站体更远的构型再等锁定。
+  observe_pose_before_place_ = node_->get_parameter_or("observe_pose_before_place", false);
+  observe_pose_              = node_->get_parameter_or("observe_pose", std::vector<double>{});
+  observe_lock_timeout_      = node_->get_parameter_or("observe_lock_timeout", 3.0);
   auto_start_          = node_->get_parameter_or("auto_start", false);
   auto_start_delay_    = node_->get_parameter_or("auto_start_delay", 3.0);
 

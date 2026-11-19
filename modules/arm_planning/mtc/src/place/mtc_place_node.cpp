@@ -9,6 +9,7 @@
 #include <rclcpp/logging.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <moveit/task_constructor/storage.h>
+#include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/robot_state/robot_state.h>
 #include <functional>
 #include <map>
@@ -104,90 +105,22 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
     auto cs = std::make_unique<stages::CurrentState>("current");
     task.add(std::move(cs));
   }
-  // 2. 预放置点：先按目标算出 TCP 位姿，再用固定种子（全零）求 IK，
-  //    最后用关节空间 MoveTo 精确走到这个构型。
+  // 2. 预放置点：由 resolveTarget() 在**建场景之前**解好（种子阶梯 + YAML 降级），
+  //    这里只负责用关节空间 MoveTo 精确走到那个构型。
   //    不能直接 Connect 到姿态：OMPL 的位姿目标会在多解 IK 里随机落点，实测
   //    会选到 joint5≈-3.13 的翻转分支；该分支做笛卡尔插入时 joint5 在柱内
   //    120 mm 处顶到 -3.14 限位，CartesianPath 只能完成 90%（Achieved: 0.900000），
   //    臂停在离座位 18 mm 处而任务仍能报 DONE。用固定种子后走的是
   //    joint5≈-0.5 → +0.15 的分支，离线 IK 验证全程可行。
-  tf2::Transform base_T_tcp, base_T_hollow;
-  if (!computeTargetTCP(base_T_tcp, base_T_hollow))
-    throw std::runtime_error("target pose compute failed");
-  publishDebugTF(base_T_hollow, "T_target_hollow");
-
   {
-    const auto &robot_model = task.getRobotModel();
-    const auto *jmg = robot_model->getJointModelGroup(arm_group_);
-    geometry_msgs::msg::PoseStamped pre_pose;
-    pre_pose.header.frame_id = planning_frame_;
-    tf2::toMsg(base_T_tcp, pre_pose.pose);
-
-    // ---- 种子阶梯 ----
-    // 目标锁定之后是确定性的，同一个失败会重复，所以必须换种子，
-    // 只靠 plan_attempts 重试是没用的。
-    // 注意：不能随机撒种子。q5≈-3.1 那条分支插到一半顶 -3.14 限位，
-    // 全零种子是特意挑出来的"能走完 180mm"的分支，扰动必须小到不会换分支。
-    auto zero_seed = [&]() {
-      moveit::core::RobotState s(robot_model);
-      s.setToDefaultValues();
-      return s;
-    };
-
-    std::vector<moveit::core::RobotState> seeds;
-    seeds.push_back(zero_seed());  // 1) 全零：验证过的好分支
-
-    if (!last_pre_place_q_.empty()) {  // 2) 上一次成功的解：跨次运行连续
-      moveit::core::RobotState s = zero_seed();
-      const auto &gvars = jmg->getVariableNames();
-      for (size_t i = 0; i < gvars.size() && i < last_pre_place_q_.size(); ++i)
-        s.setVariablePosition(gvars[i], last_pre_place_q_[i]);
-      seeds.push_back(s);
-    }
-
-    // 3) 全零 + joint5 小扰动：只为了躲开局部优化器的卡点
-    for (double dq : {+0.03, -0.03}) {
-      moveit::core::RobotState s = zero_seed();
-      std::vector<double> qj;
-      s.copyJointGroupPositions(jmg, qj);
-      qj[4] += dq;
-      s.setJointGroupPositions(jmg, qj);
-      seeds.push_back(s);
-    }
-
-    auto try_seeds = [&](const geometry_msgs::msg::Pose &target,
-                         std::vector<double> &q_out) {
-      for (size_t i = 0; i < seeds.size(); ++i) {
-        if (seeds[i].setFromIK(jmg, target, hand_frame_, 0.5)) {
-          seeds[i].copyJointGroupPositions(jmg, q_out);
-          last_pre_place_q_ = q_out;
-          RCLCPP_INFO(node_->get_logger(),
-                      "pre-place IK solved with seed %zu/%zu", i + 1, seeds.size());
-          return true;
-        }
-      }
-      return false;
-    };
-
-    std::vector<double> q;
-    if (!try_seeds(pre_pose.pose, q)) {
-      // 4) 兜底：感知目标不可信时退回 YAML 真值再试一次。
-      //    这一步会完全绕过感知，属于"能用但不可信"，必须大声报出来。
-      RCLCPP_WARN(node_->get_logger(),
-                  "pre-place IK failed on all seeds, falling back to YAML slot");
-      target_slot_.pose = yaml_slot_.pose;
-      if (!computeTargetTCP(base_T_tcp, base_T_hollow) ||
-          !try_seeds(tfToPose(base_T_tcp), q))
-        throw std::runtime_error("pre-place IK failed (perceived and YAML)");
-      publishDebugTF(base_T_hollow, "T_target_hollow");
-      RCLCPP_WARN(node_->get_logger(),
-                  "DEGRADED: this run uses the YAML slot pose, perception bypassed");
-    }
+    const auto *jmg = task.getRobotModel()->getJointModelGroup(arm_group_);
+    if (pre_place_q_.size() != jmg->getVariableCount())
+      throw std::runtime_error("pre-place joint goal not resolved");
 
     std::map<std::string, double> goal;
     const auto &vars = jmg->getVariableNames();
     for (size_t i = 0; i < vars.size(); ++i)
-      goal[vars[i]] = q[i];
+      goal[vars[i]] = pre_place_q_[i];
 
     auto move = std::make_unique<stages::MoveTo>("move_to_pre_place", pipeline);
     move->properties().configureInitFrom(Stage::PARENT, {"group"});
@@ -227,7 +160,7 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
       insert->properties().configureInitFrom(Stage::PARENT, {"group"});
       insert->setIKFrame("hollow_cylinder");
       tf2::Quaternion q;
-      tf2::fromMsg(target_slot_.pose.orientation, q);
+      tf2::fromMsg(target().pose.orientation, q);
       tf2::Matrix3x3 R(q);
       //tf2::Vector3 z_axis = R.getColumn(2);
       tf2::Vector3 insert_dir = -R.getColumn(0).normalized();
@@ -241,68 +174,10 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
       insert->setMinMaxDistance(pre_place_height_, pre_place_height_);
       place->insert(std::move(insert));
     }
-    // 3.4 插入到位后沿站体 +z 向上顶（此时单元还在夹爪上，必须在 detach 之前）
-    //     用独立求解器，避免把 min_fraction=0.5 带进 linear_insert
-    if (push_up_height_ > 1e-6) {
-      auto cartesian_push = std::make_shared<solvers::CartesianPath>();
-      cartesian_push->setStepSize(0.002);
-      cartesian_push->setMinFraction(0.9);
-
-      auto push =
-          std::make_unique<stages::MoveRelative>("push_up", cartesian_push);
-      push->properties().configureInitFrom(Stage::PARENT, {"group"});
-      push->setIKFrame(hand_frame_);
-
-      tf2::Quaternion q;
-      tf2::fromMsg(target_slot_.pose.orientation, q);
-      tf2::Vector3 z_axis = tf2::Matrix3x3(q).getColumn(2).normalized();
-
-      geometry_msgs::msg::Vector3Stamped dir;
-      dir.header.frame_id = planning_frame_;
-      dir.vector.x = z_axis.x();
-      dir.vector.y = z_axis.y();
-      dir.vector.z = z_axis.z();
-
-      push->setDirection(dir);
-      push->setMinMaxDistance(push_up_height_ * 0.95, push_up_height_);
-      place->insert(std::move(push));
-    }
-    // 3.5 第二段平移
-    // 注意：当前工装是"单元套在柱子上"，横向平移会把单元从柱子上蹭下来，
-    // 所以暂不插入这个 stage。启用时用它自己的求解器，别改共享的 cartesian，
-    // 否则会把 min_fraction=0.5 带进 linear_insert。
-    {
-      auto cartesian_slide = std::make_shared<solvers::CartesianPath>();
-      cartesian_slide->setStepSize(0.005);
-      cartesian_slide->setMinFraction(0.5);
-
-      auto slide = std::make_unique<stages::MoveRelative>("slide_along_slot_y",
-                                                          cartesian_slide);
-
-      slide->properties().configureInitFrom(Stage::PARENT, {"group"});
-      slide->setIKFrame(hand_frame_);
-
-      // ===== 计算 slot Y 方向 =====
-      tf2::Quaternion q;
-      tf2::fromMsg(target_slot_.pose.orientation, q);
-      tf2::Matrix3x3 R(q);
-
-      tf2::Vector3 y_axis = R.getColumn(1);
-      tf2::Vector3 move_dir = y_axis.normalized();
-
-      geometry_msgs::msg::Vector3Stamped dir;
-      dir.header.frame_id = planning_frame_;
-      dir.vector.x = move_dir.x();
-      dir.vector.y = move_dir.y();
-      dir.vector.z = move_dir.z();
-
-      slide->setDirection(dir);
-
-      slide->setMinMaxDistance(0.03, 0.04); // 100mm
-
-      //place->insert(std::move(slide));
-    }
-    // 3.6 允许碰撞
+    // 注：插入到位后的"向上顶"当前交给操作手处理（自动 push_up 暂时不做）。
+    //     若以后恢复，用独立 CartesianPath 求解器沿站体 +z 走，
+    //     并放在 detach_objects 之前（此时单元还在夹爪上）。
+    // 3.4 允许碰撞
     {
       auto collision = std::make_unique<stages::ModifyPlanningScene>(
           "allow_collision_after_place");
@@ -310,7 +185,7 @@ moveit::task_constructor::Task MTCTaskNode::createTask() {
       collision->allowCollisions("hollow_cylinder", gripper_links, true);
       place->insert(std::move(collision));
     }
-    // 3.7 分离物体
+    // 3.5 分离物体
     {
       auto detach =
           std::make_unique<stages::ModifyPlanningScene>("detach_objects");
@@ -336,13 +211,16 @@ geometry_msgs::msg::Pose tfToPose(const tf2::Transform &tf) {
   return pose;
 }
 
-// 计算目标 TCP 位姿：基于最新的插槽位姿和预定义的 TCP → hollow
-// 变换，计算出TCP的预插入位姿
-bool MTCTaskNode::computeTargetTCP(tf2::Transform &base_T_tcp,
+// 计算目标 TCP 位姿：基于给定的插槽位姿和预定义的 TCP → hollow
+// 变换，计算出 TCP 的预插入位姿。
+// 注意：显式传 slot 位姿，不再读 target_slot_ —— 降级后的目标只存在于
+// resolved_target_ 里，两处混用就会重新回到"模型和运动目标错开"。
+bool MTCTaskNode::computeTargetTCP(const geometry_msgs::msg::PoseStamped &slot,
+                                   tf2::Transform &base_T_tcp,
                                    tf2::Transform &base_T_hollow) {
   // base -> slot
   tf2::Transform base_T_slot;
-  tf2::fromMsg(target_slot_.pose, base_T_slot);
+  tf2::fromMsg(slot.pose, base_T_slot);
   // slot -> hollow
   // slot_collar_x  = 兑换柱法兰面（站体局部 x，实测 -0.098）
   // insert_offset_ = 单元半长：法兰面到座位中心的距离（0.075）
@@ -361,6 +239,100 @@ bool MTCTaskNode::computeTargetTCP(tf2::Transform &base_T_tcp,
   tf2::Transform hollow_T_tcp = T_tcp_hollow_.inverse();
   // base -> tcp
   base_T_tcp = base_T_hollow * hollow_T_tcp;
+  return true;
+}
+
+/* ===================== 目标定稿（IK 种子阶梯 + YAML 降级） ===================== */
+// 由 TaskNodeBase 在 setupPlanningScene 之前调用一次（每个 attempt 一次）。
+// 解出的预放置构型写 pre_place_q_，供 createTask() 建 MoveTo；
+// 若感知目标解不出 IK，会把 target 改写成 YAML 真值（只改这一份快照）。
+bool MTCTaskNode::resolveTarget(geometry_msgs::msg::PoseStamped &target) {
+  // setFromIK 需要组上的 IK 求解器（pick_ik 参数来自节点的
+  // robot_description_kinematics）。模型只在第一次用时加载。
+  if (!robot_model_) {
+    robot_model_loader::RobotModelLoader loader(node_, "robot_description");
+    robot_model_ = loader.getModel();
+    if (!robot_model_)
+      throw std::runtime_error("failed to load robot model for pre-place IK");
+  }
+
+  tf2::Transform base_T_tcp, base_T_hollow;
+  if (!computeTargetTCP(target, base_T_tcp, base_T_hollow))
+    throw std::runtime_error("target pose compute failed");
+  publishDebugTF(base_T_hollow, "T_target_hollow");
+
+  const auto *jmg = robot_model_->getJointModelGroup(arm_group_);
+  geometry_msgs::msg::PoseStamped pre_pose;
+  pre_pose.header.frame_id = planning_frame_;
+  tf2::toMsg(base_T_tcp, pre_pose.pose);
+
+  // ---- 种子阶梯 ----
+  // 目标锁定之后是确定性的，同一个失败会重复，所以必须换种子，
+  // 只靠 plan_attempts 重试是没用的。
+  // 注意：不能随机撒种子。q5≈-3.1 那条分支插到一半顶 -3.14 限位，
+  // 全零种子是特意挑出来的"能走完 180mm"的分支，扰动必须小到不会换分支。
+  auto zero_seed = [&]() {
+    moveit::core::RobotState s(robot_model_);
+    s.setToDefaultValues();
+    return s;
+  };
+
+  std::vector<moveit::core::RobotState> seeds;
+  seeds.push_back(zero_seed());  // 1) 全零：验证过的好分支
+
+  if (!last_pre_place_q_.empty()) {  // 2) 上一次成功的解：跨次运行连续
+    moveit::core::RobotState s = zero_seed();
+    const auto &gvars = jmg->getVariableNames();
+    for (size_t i = 0; i < gvars.size() && i < last_pre_place_q_.size(); ++i)
+      s.setVariablePosition(gvars[i], last_pre_place_q_[i]);
+    seeds.push_back(s);
+  }
+
+  // 3) 全零 + joint5 小扰动：只为了躲开局部优化器的卡点
+  for (double dq : {+0.03, -0.03}) {
+    moveit::core::RobotState s = zero_seed();
+    std::vector<double> qj;
+    s.copyJointGroupPositions(jmg, qj);
+    qj[4] += dq;
+    s.setJointGroupPositions(jmg, qj);
+    seeds.push_back(s);
+  }
+
+  auto try_seeds = [&](const geometry_msgs::msg::Pose &pose,
+                       std::vector<double> &q_out) {
+    for (size_t i = 0; i < seeds.size(); ++i) {
+      if (seeds[i].setFromIK(jmg, pose, hand_frame_, 0.5)) {
+        seeds[i].copyJointGroupPositions(jmg, q_out);
+        last_pre_place_q_ = q_out;
+        RCLCPP_INFO(node_->get_logger(),
+                    "pre-place IK solved with seed %zu/%zu", i + 1, seeds.size());
+        return true;
+      }
+    }
+    return false;
+  };
+
+  bool degraded = false;
+  std::vector<double> q;
+  if (!try_seeds(pre_pose.pose, q)) {
+    // 4) 兜底：感知目标不可信时退回 YAML 真值再试一次。
+    //    这一步会完全绕过感知，属于"能用但不可信"，必须大声报出来。
+    RCLCPP_WARN(node_->get_logger(),
+                "pre-place IK failed on all seeds, falling back to YAML slot");
+    target.pose = yaml_slot_.pose;   // 只改快照：target_slot_ 留给下一帧感知
+    if (!computeTargetTCP(target, base_T_tcp, base_T_hollow) ||
+        !try_seeds(tfToPose(base_T_tcp), q))
+      throw std::runtime_error("pre-place IK failed (perceived and YAML)");
+    publishDebugTF(base_T_hollow, "T_target_hollow");
+    degraded = true;
+    RCLCPP_WARN(node_->get_logger(),
+                "DEGRADED: this run uses the YAML slot pose, perception bypassed");
+  }
+
+  pre_place_q_ = q;
+  RCLCPP_INFO(node_->get_logger(), "resolved target [%.3f %.3f %.3f] (source=%s)",
+              target.pose.position.x, target.pose.position.y, target.pose.position.z,
+              degraded ? "yaml (degraded)" : "input");
   return true;
 }
 } // namespace mtc

@@ -8,7 +8,7 @@ mtc_place_node:
     #
     # 真机上要开，并且必须同时打开 target_lock：站位物理上是固定的，
     # 只在"站体无遮挡"时采一次样就锁死，之后不再跟随。
-    allow_slot_override: false
+    allow_slot_override: true
 
     # ---- 目标锁定（只在 allow_slot_override 打开时有意义）----
     # 采样条件全部满足才会锁定，锁定后忽略后续所有感知帧；
@@ -16,7 +16,18 @@ mtc_place_node:
     target_lock: true
     target_lock_frames: 10            # 连续多少帧一致才采纳
     target_lock_max_spread: 0.002     # 这 10 帧之间的最大互差（m）
-    target_lock_min_distance: 0.35    # 末端离站体超过这个距离才算"无遮挡"（m）
+    target_lock_min_distance: 0.1    # 末端离站体超过这个距离才算"无遮挡"（m）
     target_lock_max_offset: 0.015     # 与 YAML 偏离超过这个值就拒锁（m）
 
-    push_up_height: 0.0
+    # ---- 观察位（只在 place 单独跑/调试时打开）----
+    # 锁定发生在订阅回调里，采样那一刻手必须离站体 > target_lock_min_distance，
+    # 否则每一帧都被判"遮挡"（仿真 home 位实测只有 0.31 m，就是这种情况）。
+    # 比赛流程 pick→place 时手臂本来就在远处，不用开；打开后规划前会多做一次
+    # 关节空间移动：走到 observe_pose → 等 target_locked_（或超时）→ 再建任务。
+    observe_pose_before_place: false
+    observe_lock_timeout: 3.0         # 等锁定的上限（17 Hz 下 10 帧约 0.6 s）
+    # main 组 7 个关节角；留空或长度不对时整段自动跳过并打 WARN。
+    # 取值方法：RViz 里拖到离 E >0.5 m 且站体在相机画面里的构型，读 /joint_states。
+    # observe_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+    # 注：插入到位后的"向上顶"交给操作手，自动 push_up 已移除。

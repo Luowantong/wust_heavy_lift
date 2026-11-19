@@ -2,6 +2,7 @@
 
 #include "mtc/common/task_node_base.hpp"
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <moveit/robot_model/robot_model.h>
 #include <moveit/planning_scene/planning_scene.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit/task_constructor/container.h>
@@ -29,17 +30,22 @@ namespace mtc {
 class MTCTaskNode : public TaskNodeBase {
 public:
     explicit MTCTaskNode(const rclcpp::NodeOptions &options)
-    : TaskNodeBase(options, "mtc_place_node", "target_slot") {
-      push_up_height_ = node_->get_parameter_or("push_up_height", 0.03);
-    }
+    : TaskNodeBase(options, "mtc_place_node", "target_slot") {}
 protected:
   moveit::task_constructor::Task createTask() override;
   void setupPlanningScene(const geometry_msgs::msg::PoseStamped &target) override;
+  // 目标定稿：种子阶梯求 IK，全败则退回 YAML（允许改写 target）。
+  // 由 TaskNodeBase 在 setupPlanningScene 之前调用，解出的构型存 pre_place_q_。
+  bool resolveTarget(geometry_msgs::msg::PoseStamped &target) override;
 private:
-  bool computeTargetTCP(tf2::Transform &, tf2::Transform &);
-  double push_up_height_{0.03};   // 插入到位后沿站体 +z 顶起的距离
+  bool computeTargetTCP(const geometry_msgs::msg::PoseStamped &slot,
+                        tf2::Transform &, tf2::Transform &);
   // 上一次成功的预放置解（关节角度，按 arm_group_ 变量顺序）。
   // 作为 IK 种子阶梯的第 2 级：跨次运行保持连续性，优先复用同一条分支。
   std::vector<double> last_pre_place_q_;
+  // 本次运行解出的预放置构型（resolveTarget 写、createTask 读）
+  std::vector<double> pre_place_q_;
+  // 惰性加载：resolveTarget 用 setFromIK，需要组上的 IK 求解器
+  moveit::core::RobotModelConstPtr robot_model_;
 };
 }
